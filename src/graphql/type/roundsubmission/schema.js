@@ -1,5 +1,6 @@
 let baseDefinition = `
   id: ID!
+  status: RoundSubmissionStatus!
   round: Round!
   participant: User
   song: Song!
@@ -15,8 +16,18 @@ exports.schema = `
   }
   type ParticipatedRoundsubmission implements Roundsubmission {
     ${baseDefinition}
+    uploadUrl: String!
   }
   type ObservedRoundsubmission implements Roundsubmission {
     ${baseDefinition}
+  }
+  enum RoundSubmissionStatus {
+    Planned,
+    Started,
+    FillInRequested,
+    FillInAquired,
+    Submitted,
+    Completed,
+    Skipped 
   }
 `;

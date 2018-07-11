@@ -1,7 +1,7 @@
 let baseDefinition = `
   id: ID!
   index: Int!
-  publicSubmissions: [RoundSubmissions!]!
+  publicSubmissions: [Roundsubmission!]!
 `;
 
 exports.schema = `
@@ -10,11 +10,11 @@ exports.schema = `
   }
   type AdministeredRound implements Round {
     ${baseDefinition}
-    allSubmissions: [RoundSubmissions!]!
+    allSubmissions: [Roundsubmission!]!
   }
   type ParticipatedRound implements Round {
     ${baseDefinition}
-    mySubmission: RoundSubmission!
+    mySubmission: Roundsubmission!
   }
   type ObservedRound implements Round {
     ${baseDefinition}

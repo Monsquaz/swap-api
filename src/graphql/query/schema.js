@@ -40,7 +40,7 @@ exports.schema = `
     ]
   )}
   ${createSelection(
-    'user', 
+    'user',
     ['id'],
     [
       ['id', 'Int']

@@ -1,5 +1,8 @@
 let baseDefinition = `
   id: ID!
+  name: String!
+  signupStart: String!
+  signupEnd: String!
   currentRound: Round
   numRounds: Int!
   numParticipants: Int!
@@ -27,6 +30,7 @@ exports.schema = `
     initialFile: File
     allRounds: [Round!]!
     allParticipants: [User!]!
+    invitedUsers: [User!]!
   }
   type ParticipatedEvent implements Event {
     ${baseDefinition}
