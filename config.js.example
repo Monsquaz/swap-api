@@ -1,0 +1,11 @@
+
+module.exports = {
+  db: {
+    host: '',
+    user: '',
+    port: '',
+    database: '',
+    password: ''
+  },
+  apiUrl: ''
+};
