@@ -13,6 +13,7 @@ exports.schema = `
     password: String!
     firstname: String!
     lastname: String!
+    captchaResponse: String!
   }
   input UserUpdate {
     id: ID!

@@ -1,0 +1,5 @@
+
+
+exports.eventIsAdministeredByEventAndUser = async (tuples) => {
+
+};

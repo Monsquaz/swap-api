@@ -31,6 +31,7 @@ exports.schema = `
     allRounds: [Round!]!
     allParticipants: [User!]!
     invitedUsers: [User!]!
+    participatedRounds: [Round!]!
   }
   type ParticipatedEvent implements Event {
     ${baseDefinition}

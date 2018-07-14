@@ -3,7 +3,7 @@ const uniq = require('lodash.uniq');
 const inflector = require('inflector');
 import db from '../db';
 
-let applyFilter = (filter, fieldAliases, customFilters) => {
+let applyFilter = (filter, fieldAliases = {}, customFilters = {}) => {
   return Object.keys(filter).reduce((expr, k) => {
     switch (k) {
       case 'AND':
@@ -44,15 +44,15 @@ exports._Q = _Q;
 exports.listByTuple = listByTuple;
 exports.uniqT = uniqT;
 
-exports.createIdFieldSqlBatcher = (table, idColumn, nullable) => {
+exports.createIdFieldSqlBatcher = (table, idColumn, nullable = true) => {
   return async function(idColumnIds) {
-    let param = squel
+    let { text, values } = squel
       .select()
       .from(table)
       .where(`${idColumn} IN ?`, idColumnIds)
       .order(`FIELD(${idColumn}, ${_Q(idColumnIds.length)})`, null, ...idColumnIds)
       .toParam();
-    let [rows] = await db.query(param.text, param.values);
+    let [rows] = await db.query(text, values);
     if (nullable) {
       if (rows.length === idColumnIds.length) return rows;
       let ack = rows.reduce((a,e) => ({...a, [e[idColumn]]: e}), {});
@@ -65,13 +65,13 @@ exports.createIdFieldSqlBatcher = (table, idColumn, nullable) => {
 
 exports.createForeignFieldSqlBatcher = (table, foreignColumn) => {
   return async function(foreignColumnIds) {
-    let param = squel
+    let { text, values } = squel
       .select()
       .from(table)
       .where(`${foreignColumn} IN ?`, foreignColumnIds)
       .order(`FIELD(${foreignColumn}, ${_Q(foreignColumnIds.length)})`, null, ...foreignColumnIds)
       .toParam();
-    let [rows] = await db.query(param.text, param.values);
+    let [rows] = await db.query(text, values);
     return listByTuple(rows, foreignColumnIds, [foreignColumn]);
   };
 };
@@ -103,10 +103,11 @@ let createRootQuery = (type) => {
   let typePlural = type.plural();
   let typePluralUc = typePlural.charAt(0).toUpperCase() + typePlural.substr(1);
   return type.toLowerCase().plural()
-    + `(selection: ${typePluralUc}Selection): [${typeUc}!]!`;
+    + `(selection: ${typePluralUc}Selection = {}): [${typeUc}!]!`;
 };
 
 let createSelection = (type, sortFields = [], numericFields = []) => {
+  // TODO: custom filters!
   let typePlural = type.plural();
   let typePluralUc = typePlural.charAt(0).toUpperCase() + typePlural.substr(1);
   return `
@@ -126,7 +127,6 @@ let createSelection = (type, sortFields = [], numericFields = []) => {
       AND: [${typePluralUc}Filter!]
       OR: [${typePluralUc}Filter!]
       id: ID,
-      role: Role,
       ${numericFilters(numericFields)}
     }
   `;
@@ -138,7 +138,7 @@ exports.schemaHelper = {
   createSelection
 };
 
-exports.performSelection = ({query, selection, fieldAliases, customFilters}) => {
+exports.performSelection = ({ query, selection, fieldAliases = {}, customFilters = {} }) => {
   let { filters, offset, limit, sort, descending } = selection;
   if (filters) {
     query = query.where(

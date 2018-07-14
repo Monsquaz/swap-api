@@ -1,7 +1,7 @@
 exports.mutation = `
   createEvent(params: EventCreation!): StatusResponse!
   updateEvent(params: EventUpdate!): StatusResponse!
-  removeParticipantFromEvent(user_id: ID!): StatusResponse!
+  removeParticipantFromEvent(params: EventParticipantRemoval!): StatusResponse!
   joinEvent(id: ID!): StatusResponse!
   inviteUser(params: EventInvitation!): StatusResponse!
   forceNextEventRound(id: ID!): StatusResponse!
@@ -10,22 +10,23 @@ exports.mutation = `
 exports.schema = `
   input EventCreation {
     name: String!
-    signupStart: String!
-    signupEnd: String
     areChangesVisible: Boolean!
     isScheduleVisible: Boolean!
     isPublic: Boolean!
+    captchaResponse: String!
   }
   input EventUpdate {
     name: String
-    signupStart: String
-    signupEnd: String
     areChangesVisible: Boolean
     isScheduleVisible: Boolean
     isPublic: Boolean
   }
   input EventInvitation {
     id: ID!
-    user_id: Int!
+    userId: Int!
+  }
+  input EventParticipantRemoval {
+    eventId: ID!
+    userId: ID!
   }
 `;

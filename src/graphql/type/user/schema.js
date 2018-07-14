@@ -7,19 +7,19 @@ exports.schema = `
   interface User {
     ${baseDefinition}
   }
-  type AdministeredUser {
+  type AdministeredUser implements User {
     ${baseDefinition}
     firstname: String!
     lastname: String!
     email: String!
   }
-  type OwnedUser {
+  type OwnedUser implements User {
     ${baseDefinition}
     firstname: String!
     lastname: String!
     email: String!
   }
-  type ObservedUser {
+  type ObservedUser implements User {
     ${baseDefinition}
   }
 `;

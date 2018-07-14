@@ -8,6 +8,8 @@ CREATE TABLE users (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(50) NOT NULL,
   email VARCHAR(255) NOT NULL,
+  firstname VARCHAR(100) NOT NULL,
+  lastname VARCHAR(100) NOT NULL,
   password VARCHAR(128) NOT NULL,
   activation_status TINYINT(4) NOT NULL,
   activation_code VARCHAR(128) NOT NULL
@@ -15,7 +17,8 @@ CREATE TABLE users (
 
 CREATE TABLE rounds (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  event_id INT NOT NULL
+  event_id INT NOT NULL,
+  `index` INT NOT NULL
 );
 
 CREATE TABLE roundsubmissions (
@@ -24,6 +27,7 @@ CREATE TABLE roundsubmissions (
   song_id INT NOT NULL,
   status ENUM('Planned','Started','FillInRequested','FillinAquired','Submitted','Completed','Skipped'),
   participant INT,
+  fill_in_participant INT,
   file INT,
   previous INT,
   next INT,
@@ -32,11 +36,15 @@ CREATE TABLE roundsubmissions (
 
 ALTER TABLE roundsubmissions ADD FOREIGN KEY (previous) REFERENCES roundsubmissions (id) ON UPDATE CASCADE ON DELETE SET NULL;
 ALTER TABLE roundsubmissions ADD FOREIGN KEY (next) REFERENCES roundsubmissions (id) ON UPDATE CASCADE ON DELETE SET NULL;
+ALTER TABLE roundsubmissions ADD FOREIGN KEY (participant) REFERENCES users (id) ON UPDATE CASCADE ON DELETE SET NULL;
+ALTER TABLE roundsubmissions ADD FOREIGN KEY (fill_in_participant) REFERENCES users (id) ON UPDATE CASCADE ON DELETE SET NULL;
+ALTER TABLE roundsubmissions ADD FOREIGN KEY (file_id) REFERENCES files (id) ON UPDATE CASCADE ON DELETE SET NULL;
 
 CREATE TABLE events (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  signup_start DATETIME NOT NULL,
-  signup_end DATETIME NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  created DATETIME NOT NULL,
+  status ENUM('Planned','Started','Completed'),
   current_round INT,
   num_rounds INT NOT NULL,
   num_participants INT NOT NULL,
