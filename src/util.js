@@ -106,8 +106,12 @@ let createRootQuery = (type) => {
     + `(selection: ${typePluralUc}Selection = {}): [${typeUc}!]!`;
 };
 
-let createSelection = (type, sortFields = [], numericFields = []) => {
-  // TODO: custom filters!
+let createSelection = ({ type, directFields, sortFields, numericFields }) => {
+  // TODO: custom filters
+  if (!type) throw new Error ('');
+  sortFields = sortFields || [];
+  directFields = directFields || {};
+  numericFields = numericFields || [];
   let typePlural = type.plural();
   let typePluralUc = typePlural.charAt(0).toUpperCase() + typePlural.substr(1);
   return `
@@ -127,6 +131,7 @@ let createSelection = (type, sortFields = [], numericFields = []) => {
       AND: [${typePluralUc}Filter!]
       OR: [${typePluralUc}Filter!]
       id: ID,
+      ${Object.keys(directFields).map(f => `${f}: ${directFields[f]}`).join('\n')}
       ${numericFilters(numericFields)}
     }
   `;

@@ -28,7 +28,8 @@ CREATE TABLE roundsubmissions (
   status ENUM('Planned','Started','FillInRequested','FillinAquired','Submitted','Completed','Skipped'),
   participant INT,
   fill_in_participant INT,
-  file INT,
+  file_id_seeded INT,
+  file_id_submitted INT,
   previous INT,
   next INT,
   event_id INT NOT NULL
@@ -38,7 +39,8 @@ ALTER TABLE roundsubmissions ADD FOREIGN KEY (previous) REFERENCES roundsubmissi
 ALTER TABLE roundsubmissions ADD FOREIGN KEY (next) REFERENCES roundsubmissions (id) ON UPDATE CASCADE ON DELETE SET NULL;
 ALTER TABLE roundsubmissions ADD FOREIGN KEY (participant) REFERENCES users (id) ON UPDATE CASCADE ON DELETE SET NULL;
 ALTER TABLE roundsubmissions ADD FOREIGN KEY (fill_in_participant) REFERENCES users (id) ON UPDATE CASCADE ON DELETE SET NULL;
-ALTER TABLE roundsubmissions ADD FOREIGN KEY (file_id) REFERENCES files (id) ON UPDATE CASCADE ON DELETE SET NULL;
+ALTER TABLE roundsubmissions ADD FOREIGN KEY (file_id_seeded) REFERENCES files (id) ON UPDATE CASCADE ON DELETE SET NULL;
+ALTER TABLE roundsubmissions ADD FOREIGN KEY (file_id_submitted) REFERENCES files (id) ON UPDATE CASCADE ON DELETE SET NULL;
 
 CREATE TABLE events (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,

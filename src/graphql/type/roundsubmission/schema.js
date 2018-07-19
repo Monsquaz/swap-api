@@ -5,6 +5,7 @@ let baseDefinition = `
   participant: User
   song: Song!
   file: File
+  event: Event!
 `;
 
 exports.schema = `
@@ -28,6 +29,6 @@ exports.schema = `
     FillInAquired,
     Submitted,
     Completed,
-    Skipped 
+    Skipped
   }
 `;

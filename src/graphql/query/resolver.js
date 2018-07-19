@@ -19,7 +19,12 @@ exports.resolver = {
           .or('ei.user_id = ?', userId)
           .or('e.host_user_id = ?', userId)
         );
-      query = performSelection({ query, selection });
+      query = performSelection({
+        query,
+        fieldAliases: {},
+        directFields: {},
+        selection
+      });
       let param = query.toParam();
       let rows = await sql.load(param);
       return await eventsById.loadMany(rows.map(({ id }) => id));
@@ -29,7 +34,7 @@ exports.resolver = {
       let { userId, loaders } = ctx;
       let { sql, filesById } = loaders;
       let query = select().field('f.id').from('files', 'f')
-        .join('roundsubmissions', 'rs', 'f.id = rs.file_id')
+        .left_join('roundsubmissions', 'rs', 'f.id = rs.file_id')
         .join('events', 'e', 'rs.event_id = e.id')
         .where(
            or('rs.participant = ?', userId)
@@ -43,7 +48,16 @@ exports.resolver = {
           )
           .or('e.host_user_id = ?', userId)
         );
-      query = performSelection({ query, selection });
+      query = performSelection({
+        query,
+        fieldAliases: {
+          eventId: 'e.id'
+        },
+        directFields: {
+          eventId: 'Int'
+        },
+        selection
+      });
       let param = query.toParam();
       let rows = await sql.load(param);
       return await filesById.loadMany(rows.map(({ id }) => id));
@@ -66,7 +80,16 @@ exports.resolver = {
           )
           .or('e.host_user_id = ?', userId)
         );
-      query = performSelection({ query, selection });
+      query = performSelection({
+        query,
+        fieldAliases: {
+          eventId: 'e.id'
+        },
+        directFields: {
+          eventId: 'Int'
+        },
+        selection
+     });
       let param = query.toParam();
       let rows = await sql.load(param);
       return await roundsubmissionsById.loadMany(rows.map(({ id }) => id));
@@ -91,7 +114,16 @@ exports.resolver = {
           )
           .or('e.host_user_id = ?', userId)
         );
-      query = performSelection({ query, selection });
+      query = performSelection({
+        query,
+        fieldAliases: {
+          eventId: 'e.id'
+        },
+        directFields: {
+          eventId: 'Int'
+        },
+        selection
+      });
       let param = query.toParam();
       let rows = await sql.load(param);
       return await songsById.loadMany(rows.map(({ id }) => id));

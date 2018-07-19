@@ -11,39 +11,39 @@ exports.query = `
   ].map(createRootQuery).join('\n')}`;
 
 exports.schema = `
-  ${createSelection(
-    'event',
-    ['id'],
-    [
+  ${createSelection({
+    type: 'event',
+    sortFields: ['id'],
+    numericFields: [
       ['id', 'Int']
     ]
-  )}
-  ${createSelection(
-    'file',
-    ['id'],
-    [
+  })}
+  ${createSelection({
+    type: 'file',
+    sortFields: ['id'],
+    numericFields: [
       ['id', 'Int']
     ]
-  )}
-  ${createSelection(
-    'roundsubmission',
-    ['id'],
-    [
+  })}
+  ${createSelection({
+    type: 'roundsubmission',
+    sortFields: ['id'],
+    numericFields: [
       ['id', 'Int']
     ]
-  )}
-  ${createSelection(
-    'song',
-    ['id'],
-    [
+  })}
+  ${createSelection({
+    type: 'song',
+    sortFields: ['id'],
+    numericFields: [
       ['id', 'Int']
     ]
-  )}
-  ${createSelection(
-    'user',
-    ['id'],
-    [
+  })}
+  ${createSelection({
+    type: 'user',
+    sortFields: ['id'],
+    numericFields: [
       ['id', 'Int']
     ]
-  )}
+  })}
 `;

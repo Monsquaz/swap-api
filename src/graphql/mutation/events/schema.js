@@ -1,10 +1,12 @@
 exports.mutation = `
   createEvent(params: EventCreation!): StatusResponse!
+  startEvent(id: ID!): StatusResponse!
+  endEvent(id: ID!): StatusResponse!
   updateEvent(params: EventUpdate!): StatusResponse!
   removeParticipantFromEvent(params: EventParticipantRemoval!): StatusResponse!
   joinEvent(id: ID!): StatusResponse!
   inviteUser(params: EventInvitation!): StatusResponse!
-  forceNextEventRound(id: ID!): StatusResponse!
+  nextEventRound(id: ID!): StatusResponse!
 `;
 
 exports.schema = `
