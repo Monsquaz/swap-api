@@ -1,10 +1,16 @@
-
 import config from './config';
 import db from './db';
 import { GraphQLServer } from 'graphql-yoga'
 import glue from 'schemaglue';
 import { createLoaders } from './src/loaders';
+import { getUserIdFromToken } from './src/util';
+import {
+  getFile,
+  uploadRoundsubmissionFile,
+  uploadEventFile
+} from './src/services/files';
 import jwt from 'jsonwebtoken';
+import fileUpload from 'express-fileupload';
 
 const { schema, resolver } = glue('src/graphql');
 
@@ -17,14 +23,20 @@ const server = new GraphQLServer({
     let userId = null;
     let loaders = createLoaders();
     if (authorization) {
-      let [ authType, authToken, _ ] = authorization.split(' ');
-      if (_ || authType !== 'Bearer') {
-        throw new Error('Malformed authorization header');
-      }
-      userId = (jwt.verify(authToken, config.jwt.secret)).userId;
+      userId = getUserIdFromToken(authorization);
     }
     return { userId, loaders };
   }
 });
 
 server.start(() => console.log('Server is running on localhost:4000'));
+
+// Additional services
+server.express.use(fileUpload({
+  limits: { fileSize: 20 * 1024 * 1024 },
+  safeFileNames: true,
+  abortOnLimit: true
+}));
+server.express.get('/files/:id', getFile);
+server.express.post('/roundsubmissions/:id/file', uploadRoundsubmissionFile);
+server.express.post('/events/:id/file', uploadEventFile);

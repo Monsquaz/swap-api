@@ -159,3 +159,13 @@ exports.performSelection = ({ query, selection, fieldAliases = {}, customFilters
     .limit(limit || 500);
   return query;
 }
+
+exports.getUserIdFromToken = (header) => {
+  let [ authType, authToken, _ ] = header.split(' ');
+  if (_ || authType !== 'Bearer') {
+    throw new Error('Malformed authorization header');
+  }
+  let obj = (jwt.verify(authToken, config.jwt.secret));
+  if (!('userId' in obj)) throw new Error('No user id found');
+  return obj.userId;
+}
