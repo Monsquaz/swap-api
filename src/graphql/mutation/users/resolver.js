@@ -3,6 +3,7 @@ import base64url from 'base64url';
 import phpPassword from 'node-php-password';
 import validator from 'validator';
 import strength from 'strength';
+import slugify from 'slugify';
 import nodemailer from 'nodemailer';
 import config from '../../../../config';
 import squel from 'squel';
@@ -26,16 +27,17 @@ exports.resolver = {
       let [byEmail, byUsername] = await Promise.all([
         usersByEmail.load(email), usersByUsername.load(username)
       ]);
-      if (byEmail.length > 0) {
+      if (byEmail) {
         throw new Error('A user already exists with that email.');
       }
-      if (byUsername.length > 0) {
+      if (byUsername) {
         throw new Error('A user already exists with that username.');
       }
       let data = {
         ...formatParameters({
           email, username, password, firstname, lastname, captchaResponse
         }),
+        slug: slugify(username.toLowerCase()),
         activation_code: getGeneratedVerificationCode(48),
         activation_status: 0
       };
@@ -96,6 +98,7 @@ exports.resolver = {
       let { username, password } = params;
       let user = await usersByUsername.load(username);
       if (!user) throw new Error('Invalid username or password.');
+      if (user.activation_status == 0) throw new Error('User is not active.');
       let passwordOk = phpPassword.verify(password, user.password);
       if (!passwordOk) throw Error('Invalid email or password.');
       let authToken = jwt.sign({ userId: String(user.id) }, config.jwt.secret);

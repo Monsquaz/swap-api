@@ -7,6 +7,11 @@ import { performSelection, filterFns } from '../../util';
 exports.resolver = {
   Query: {
 
+    currentUser: async (_, __, { userId, loaders: { usersById } }) => {
+      if (!userId) return null;
+      return await usersById.load(userId);
+    },
+
     events: async (_, { selection }, ctx ) => {
       let { userId, loaders } = ctx;
       let { sql, eventsById } = loaders;

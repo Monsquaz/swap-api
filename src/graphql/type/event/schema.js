@@ -1,8 +1,8 @@
 let baseDefinition = `
   id: ID!
+  created: String!
   name: String!
-  signupStart: String!
-  signupEnd: String!
+  slug: String!
   currentRound: Round
   numRounds: Int!
   numParticipants: Int!

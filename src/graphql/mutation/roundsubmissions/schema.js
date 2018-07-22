@@ -1,3 +1,10 @@
-exports.schema = ``;
+exports.schema = `
+  input RoundSkip {
+    roundsubmissionId: Int!
+    userId: Int
+  }
+`;
 
-exports.mutation = ``;
+exports.mutation = `
+  skipRound(params: RoundSkip!): StatusResponse!
+`;

@@ -78,17 +78,28 @@ exports.resolver = {
         eventParticipationByEventAndUser.load([eventId, participantId])
       );
       if (!event) throw new Error ('Event not found');
-      if (userId !== event.host_user_id) {
-        throw new Error('You can only remove participants from your own events');
+      if (userId !== event.host_user_id && userId != participantId) {
+        throw new Error(
+          'You can only remove participants from your own events, or remove yourself.'
+        );
       }
       if (!participant) throw Error('User does not exist');
       if (!isParticipating) throw Error('User is not participating in the event');
-      let { text, values }
-        = _delete().from('event_participants').where(
-           and('event_id = ?', eventId)
-          .and('user_id = ?', participantId)
-        )
-      let result = await db.query(text, values);
+      switch (event.status) {
+        case 'Planned': { // Remove from participants list
+          let { text, values }
+            = _delete().from('event_participants').where(
+               and('event_id = ?', eventId)
+              .and('user_id = ?', participantId)
+            )
+          let result = await db.query(text, values);
+          break;
+        }
+        case 'Started': {
+          // TODO
+        }
+        case 'Completed': throw new Error('Event already completed');
+      }
       return { code: 200, message: 'Participant removed successfully' };
     },
 

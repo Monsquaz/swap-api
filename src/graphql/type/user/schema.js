@@ -1,6 +1,8 @@
 let baseDefinition = `
   id: ID!
+  slug: String!
   username: String!
+  gravatar(size: Int): String!
 `
 
 exports.schema = `

@@ -1,5 +1,3 @@
-import config from './config';
-import db from './db';
 import { GraphQLServer } from 'graphql-yoga'
 import glue from 'schemaglue';
 import { createLoaders } from './src/loaders';
@@ -9,7 +7,6 @@ import {
   uploadRoundsubmissionFile,
   uploadEventFile
 } from './src/services/files';
-import jwt from 'jsonwebtoken';
 import fileUpload from 'express-fileupload';
 
 const { schema, resolver } = glue('src/graphql');

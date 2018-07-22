@@ -1,6 +1,8 @@
 const squel = require('squel');
 const uniq = require('lodash.uniq');
 const inflector = require('inflector');
+import jwt from 'jsonwebtoken';
+import config from '../config';
 import db from '../db';
 
 let applyFilter = (filter, fieldAliases = {}, customFilters = {}) => {

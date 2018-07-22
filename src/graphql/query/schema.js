@@ -2,12 +2,9 @@ import { schemaHelper } from '../../util';
 const { createRootQuery, createSelection } = schemaHelper;
 
 exports.query = `
+  currentUser: User
   ${[
-    'event',
-    'file',
-    'roundsubmission',
-    'song',
-    'user'
+    'event','file','roundsubmission','song','user'
   ].map(createRootQuery).join('\n')}`;
 
 exports.schema = `
