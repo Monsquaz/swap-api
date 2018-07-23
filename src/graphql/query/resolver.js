@@ -15,7 +15,9 @@ exports.resolver = {
     events: async (_, { selection }, ctx ) => {
       let { userId, loaders } = ctx;
       let { sql, eventsById } = loaders;
-      let query = select().field('e.id').from('events','e')
+      let query = select().field('e.id')
+        .field(`SUM(IF(ep.user_id = ${parseInt(userId, 10)}, 1, 0))`, 'participation')
+        .from('events','e')
         .left_join('event_participants', 'ep', 'e.id = ep.event_id')
         .left_join('event_invitations', 'ei', 'e.id = ei.event_id')
         .where(
@@ -23,16 +25,32 @@ exports.resolver = {
           .or('ep.user_id = ?', userId)
           .or('ei.user_id = ?', userId)
           .or('e.host_user_id = ?', userId)
-        );
+        )
+        .group('e.id');
+      if ('filters' in selection && selection.filters.isParticipating !== null) {
+        let value = selection.filters.isParticipating;
+        if (value === true) {
+          if (!userId) query = query.where('1 = 0');
+          else query = query.having('participation >= 1');
+        } else if (value === false) {
+          if (userId) query = query.having('participation = 0');
+        }
+      }
       query = performSelection({
         query,
-        fieldAliases: {},
-        directFields: {},
+        fieldAliases: {
+          isPublic: 'is_public',
+          hostUserId: 'host_user_id'
+        },
+        customFilters: {
+          isParticipating: (value, expr) => expr // Handled above
+        },
         selection
       });
       let param = query.toParam();
       let rows = await sql.load(param);
-      return await eventsById.loadMany(rows.map(({ id }) => id));
+      let res = await eventsById.loadMany(rows.map(({ id }) => id));
+      return res;
     },
 
     files: async (_, { selection }, ctx ) => {
@@ -57,9 +75,6 @@ exports.resolver = {
         query,
         fieldAliases: {
           eventId: 'e.id'
-        },
-        directFields: {
-          eventId: 'Int'
         },
         selection
       });
@@ -89,9 +104,6 @@ exports.resolver = {
         query,
         fieldAliases: {
           eventId: 'e.id'
-        },
-        directFields: {
-          eventId: 'Int'
         },
         selection
      });
@@ -123,9 +135,6 @@ exports.resolver = {
         query,
         fieldAliases: {
           eventId: 'e.id'
-        },
-        directFields: {
-          eventId: 'Int'
         },
         selection
       });

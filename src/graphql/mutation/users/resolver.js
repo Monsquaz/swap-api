@@ -10,6 +10,7 @@ import squel from 'squel';
 const { insert, update  } = squel;
 import jwt from 'jsonwebtoken';
 import db from '../../../../db';
+import { getMailer, isCaptchaOK } from '../../../util';
 
 exports.resolver = {
   Mutation: {
@@ -20,6 +21,9 @@ exports.resolver = {
       let { params } = args;
       let { email, username, password, firstname, lastname, captchaResponse }
         = params;
+      if (!(await isCaptchaOK(captchaResponse))) {
+        throw new Error('Invalid captcha response');
+      }
       let validationMessages = validateFields(params);
       if (validationMessages.length > 0) {
         throw new Error('Validation error: ' + validationMessages.join(', '));
@@ -33,17 +37,30 @@ exports.resolver = {
       if (byUsername) {
         throw new Error('A user already exists with that username.');
       }
+      let activation_code = getGeneratedVerificationCode(48);
       let data = {
         ...formatParameters({
           email, username, password, firstname, lastname, captchaResponse
         }),
         slug: slugify(username.toLowerCase()),
-        activation_code: getGeneratedVerificationCode(48),
+        activation_code,
         activation_status: 0
       };
       let { text, values }
         = insert().into('users').setFields(data).toParam();
       let [{ insertId }] = await db.query(text, values);
+      let mailer = getMailer();
+      mailer.sendMail({
+        from: 'swap@monsquaz.org',
+        to: email,
+        subject: 'User registration: Almost done',
+        text: `Hi ${firstname}!` + '\n' +
+          'Thank you for registering at Monsquaz Swap.\n' +
+          'To complete your registration, all you need to do is visit this link\n\n' +
+          `<a href="${config.siteUrl}/users/${insertId}/activation/${activation_code}"></a>` + '\n\n' +
+          'Regards,\n' +
+          'Monsquaz Swap'
+      });
       return { code: 200, message: 'User created successfully' }
     },
 
@@ -71,8 +88,11 @@ exports.resolver = {
       let { userId, loaders } = ctx;
       let { usersById } = loaders;
       let { params } = args;
-      let { id, email, username, password, firstname, lastname } = params;
+      let { id, email, username, password, firstname, lastname, captchaResponse } = params;
       if (userId !== id ) throw new Error('You can only update your own user');
+      if (!(await isCaptchaOK(captchaResponse))) {
+        throw new Error('Invalid captcha response');
+      }
       let user = await usersById.load(id);
       if (!user) throw new Error('User doesn\'t exist');
       let validationMessages = validateFields(params);
@@ -127,16 +147,11 @@ let validateFields = (data) => {
       case 'password':
         if (strength(v) < 2) return [ ...ack, "Password is not strong enough" ]
           return ack;
-      case 'captchaResponse':
-        if(!isValidCaptchaResponse(v)) return [ ...ack, "Invalid captcha" ]
-        return ack;
       default:
         return ack;
     }
   }, [])
 };
-
-let isValidCaptchaResponse = (captchaResponse) => true; // TEMP!
 
 let formatParameters = (params) => {
   let res = Object.keys(params).reduce((ack, k) => {

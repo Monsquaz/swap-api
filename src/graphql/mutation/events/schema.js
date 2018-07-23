@@ -12,13 +12,16 @@ exports.mutation = `
 exports.schema = `
   input EventCreation {
     name: String!
+    description: String!
     areChangesVisible: Boolean!
     isScheduleVisible: Boolean!
     isPublic: Boolean!
     captchaResponse: String!
   }
   input EventUpdate {
+    id: ID!
     name: String
+    description: String
     areChangesVisible: Boolean
     isScheduleVisible: Boolean
     isPublic: Boolean

@@ -2,6 +2,7 @@ const squel = require('squel');
 const uniq = require('lodash.uniq');
 const inflector = require('inflector');
 import jwt from 'jsonwebtoken';
+import nodemailer from 'nodemailer';
 import config from '../config';
 import db from '../db';
 
@@ -18,8 +19,10 @@ let applyFilter = (filter, fieldAliases = {}, customFilters = {}) => {
         if (k in customFilters) {
           return customFilters[k](filter[k], expr);
         }
+        if (filter[k] === null) return expr; // If null, we default to not filtering
+        let op = Array.isArray(filter[k]) ? 'IN' : '=';
         return expr.and(
-          `${fieldAliases && k in fieldAliases ? fieldAliases[k] : k} IN ?`,
+          `${fieldAliases && k in fieldAliases ? fieldAliases[k] : k} ${op} ?`,
           filter[k]
         );
     }
@@ -45,6 +48,39 @@ let uniqT = (tuples) => uniq(tuples.map(t => t.join(','))).map(t => t.split(',')
 exports._Q = _Q;
 exports.listByTuple = listByTuple;
 exports.uniqT = uniqT;
+
+exports.truncateWithEllipses = (text, max) => text.substr(0,max-1)+(text.length>max?'&hellip;':'');
+
+/*
+exports.getMailer = () => {
+  return nodemailer.createTransport({
+    sendmail: true,
+    newline: 'unix',
+    path: '/usr/sbin/sendmail'
+  });
+};*/
+
+// Temp. For debugging.
+exports.getMailer = () => ({
+  sendMail: (data) => {
+    console.warn('sendMail: ', data)
+  }
+});
+
+import reCaptcha from 'recaptcha2';
+
+exports.isCaptchaOK = async (response) => {
+  let recaptcha = new reCaptcha({
+    siteKey:   config.reCaptcha.siteKey,
+    secretKey: config.reCaptcha.secretKey
+  })
+  try {
+    await recaptcha.validate(response);
+    return true;
+  } catch(err) {
+    return false;
+  }
+};
 
 exports.createIdFieldSqlBatcher = (table, idColumn, nullable = true) => {
   return async function(idColumnIds) {

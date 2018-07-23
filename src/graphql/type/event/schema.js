@@ -1,22 +1,31 @@
 let baseDefinition = `
   id: ID!
+  status: EventStatus!
   created: String!
   name: String!
+  description(maxLength: Int): String!
   slug: String!
   currentRound: Round
-  numRounds: Int!
-  numParticipants: Int!
+  numRounds: Int
+  numParticipants: Int
   publicParticipants: [User!]!
-  host: User!
+  host: User
   publicRounds: [Round!]!
   areChangesVisible: Boolean!
   isScheduleVisible: Boolean!
   isPublic: Boolean!
+  isParticipant: Boolean!
+  isAdministrator: Boolean!
 `;
 
 exports.schema = `
   interface Event {
     ${baseDefinition}
+  }
+  enum EventStatus {
+    Planned,
+    Started,
+    Completed
   }
   type AdministeredEvent implements Event {
     ${baseDefinition}

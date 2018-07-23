@@ -62,10 +62,10 @@ CREATE TABLE events (
            'Planned',
            'Started',
            'Completed'
-         ),
+         ) NOT NULL DEFAULT 'Planned',
   current_round INT,
-  num_rounds INT NOT NULL,
-  num_participants INT NOT NULL,
+  num_rounds INT,
+  num_participants INT,
   host_user_id INT,
   are_changes_visible TINYINT(4) NOT NULL,
   is_schedule_visible TINYINT(4) NOT NULL,

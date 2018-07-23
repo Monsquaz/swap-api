@@ -11,6 +11,12 @@ exports.schema = `
   ${createSelection({
     type: 'event',
     sortFields: ['id'],
+    directFields: {
+      status: 'EventStatus',
+      isParticipating: 'Boolean',
+      isPublic: 'Boolean',
+      hostUserId: 'Int'
+    },
     numericFields: [
       ['id', 'Int']
     ]

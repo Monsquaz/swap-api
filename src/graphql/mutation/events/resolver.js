@@ -4,28 +4,41 @@ import strength from 'strength';
 import nodemailer from 'nodemailer';
 import config from '../../../../config';
 import squel from 'squel';
+import slugify from 'slugify';
 const and = (...args) => squel.expr().and(...args);
 const or = (...args) => squel.expr().or(...args);
 import { getRandomLatinSquare } from 'jacobson-matthews-latin-square-js';
 const { insert, update } = squel;
 let _delete = squel.delete;
 import db from '../../../../db';
+import { getMailer, isCaptchaOK } from '../../../util';
 
 exports.resolver = {
   Mutation: {
 
     createEvent: async (_, args, ctx) => {
       let { userId, loaders } = ctx;
+      let { eventsBySlug } = loaders;
       let { params } = args;
       let {
-        name, areChangesVisible, isScheduleVisible, isPublic, captchaResponse
+        name, description, areChangesVisible, isScheduleVisible, isPublic, captchaResponse
       } = params;
+      if (!(await isCaptchaOK(captchaResponse))) {
+        throw new Error('Invalid captcha response');
+      }
       let validationMessages = validateFields(params);
       if (validationMessages.length > 0) {
         throw new Error('Validation error: ' + validationMessages.join(', '));
       }
+      let slug = slugify(name.toLowerCase());
+      let event = await eventsBySlug.load(slug);
+      if (event) throw new Error('Event name is not unique');
       let data = {
         name,
+        description,
+        created: squel.rstr('NOW()'),
+        slug,
+        host_user_id: userId,
         are_changes_visible: areChangesVisible,
         is_schedule_visible: isScheduleVisible,
         is_public: isPublic
@@ -39,10 +52,10 @@ exports.resolver = {
 
     updateEvent: async (_, args, ctx) => {
       let { userId, loaders } = ctx;
-      let { eventsById } = loaders;
+      let { eventsById, eventsBySlug } = loaders;
       let { params } = args;
       let {
-        id, name, areChangesVisible, isScheduleVisible, isPublic, captchaResponse
+        id, name, description, areChangesVisible, isScheduleVisible, isPublic
       } = params;
       let event = await eventsById.load(id);
       if (!event) throw new Error ('Event not found');
@@ -53,8 +66,15 @@ exports.resolver = {
       if (validationMessages.length > 0) {
         throw new Error('Validation error: ' + validationMessages.join(', '));
       }
+      let slug = slugify(name.toLowerCase());
+      let eventBySlugCheck = await eventsBySlug.load(slug);
+      if (eventBySlugCheck && eventBySlugCheck.id != event.id) {
+        throw new Error('Event name is not unique');
+      }
       let data = {
         name,
+        description,
+        slug,
         are_changes_visible: areChangesVisible,
         is_schedule_visible: isScheduleVisible,
         is_public: isPublic
@@ -318,10 +338,7 @@ let validateFields = (data) => {
     let v = data[k];
     switch (k) {
       case 'name':
-        if (!validator.isAlpha(v)) return [ ...ack, "Name must be alphanumeric" ];
-        return ack;
-      case 'captchaResponse':
-        if(!isValidCaptchaResponse(v)) return [ ...ack, "Invalid captcha" ]
+        if (!/^[A-Za-z\d ]+$/.test(v)) return [ ...ack, "Name must contain only alphanumerical characters or spaces" ];
         return ack;
       default:
         return ack;
@@ -329,17 +346,17 @@ let validateFields = (data) => {
   }, [])
 };
 
-let isValidCaptchaResponse = (captchaResponse) => true; // TEMP!
-
 let formatParameters = (params) => {
   let res = Object.keys(params).reduce((ack, k) => {
     let v = params[k];
     switch (k) {
       case 'name':
+      case 'slug':
+      case 'description':
         return { ...ack, [k]: v.trim() };
       default:
         return ack;
     }
-  }, {});
+  }, { ...params });
   return res;
 };
