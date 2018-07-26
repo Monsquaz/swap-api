@@ -1,7 +1,7 @@
 CREATE TABLE files (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  filename VARCHAR(255) NOT NULL UNIQUE,
-  sizeBytes INT NOT NULL
+  filename VARCHAR(255) UNIQUE,
+  sizeBytes INT
 );
 
 CREATE TABLE users (
@@ -54,6 +54,8 @@ ALTER TABLE roundsubmissions ADD FOREIGN KEY (file_id_submitted) REFERENCES file
 CREATE TABLE events (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   created DATETIME NOT NULL,
+  started DATETIME,
+  completed DATETIME,
   name VARCHAR(255) NOT NULL UNIQUE,
   slug VARCHAR(255) NOT NULL UNIQUE,
   description TEXT NOT NULL,

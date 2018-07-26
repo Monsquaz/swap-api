@@ -15,5 +15,6 @@ module.exports = {
   siteUrl: '',
   jwt: {
     secret: ''
-  }
+  },
+  filesDir: ''
 };

@@ -26,7 +26,9 @@ const server = new GraphQLServer({
   }
 });
 
-server.start(() => console.log('Server is running on localhost:4000'));
+server.start({
+  deduplicator: true
+},() => console.log('Server is running on localhost:4000'));
 
 // Additional services
 server.express.use(fileUpload({

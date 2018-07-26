@@ -1,7 +1,7 @@
 exports.schema = `
   input RoundSkip {
-    roundsubmissionId: Int!
-    userId: Int
+    roundsubmissionId: ID!
+    userId: ID
   }
 `;
 

@@ -8,7 +8,7 @@ import slugify from 'slugify';
 const and = (...args) => squel.expr().and(...args);
 const or = (...args) => squel.expr().or(...args);
 import { getRandomLatinSquare } from 'jacobson-matthews-latin-square-js';
-const { insert, update } = squel;
+const { select, insert, update } = squel;
 let _delete = squel.delete;
 import db from '../../../../db';
 import { getMailer, isCaptchaOK } from '../../../util';
@@ -107,16 +107,24 @@ exports.resolver = {
       if (!isParticipating) throw Error('User is not participating in the event');
       switch (event.status) {
         case 'Planned': { // Remove from participants list
-          let { text, values }
-            = _delete().from('event_participants').where(
+          await db.transaction(async (t) => {
+            let data = { event_id: id, user_id: userId, created: squel.rstr('NOW()') };
+            let param1 = _delete().from('event_participants').where(
                and('event_id = ?', eventId)
               .and('user_id = ?', participantId)
-            )
-          let result = await db.query(text, values);
+            );
+            let param2 = insert().into('events').set('numParticipants = numParticipants - 1')
+              .where('id = ?', id).toParam();
+            await Promise.all([
+              db.query(param1.text, param1.values),
+              db.query(param2.text, param2.values),
+            ]);
+            return;
+          });
           break;
         }
         case 'Started': {
-          // TODO
+          // TODO: Should it be allowed?
         }
         case 'Completed': throw new Error('Event already completed');
       }
@@ -125,45 +133,55 @@ exports.resolver = {
 
     joinEvent: async (_, args, ctx) => {
       let { userId, loaders } = ctx;
-      let { eventsById } = loaders;
-      let { params } = args;
-      let { id } = params;
-      let [ event, isParticipating, isInvited ] = await Promise.all(
-        eventsById.load(eventId),
-        eventParticipationByEventAndUser.load([ eventId, userId ]),
-        eventInvitationByEventAndUser.load([ eventId, userId ])
-      );
+      let { eventsById,
+        eventIsParticipatedByEventAndUser,
+        eventWasInvitedByEventAndUser } = loaders;
+      let { id } = args;
+      let [ event, isParticipating, isInvited ] = await Promise.all([
+        eventsById.load(id),
+        eventIsParticipatedByEventAndUser.load([ id, userId ]),
+        eventWasInvitedByEventAndUser.load([ id, userId ])
+      ]);
       if (!event) throw new Error('Event does not exist.');
       if (!event.is_public && !isInvited && event.host_user_id != userId) {
         throw new Error('Event does not exist.')
       }
       if (isParticipating) throw new Error('You are already participating in the event.');
-      let data = { event_id: id, user_id: userId };
-      let { text, values }
-        = insert().into('event_participants').setFields(data);
-      let result = await db.query(text, values);
+      await db.transaction(async (t) => {
+        let data = { event_id: id, user_id: userId, created: squel.rstr('NOW()') };
+        let param1 = insert().into('event_participants').setFields(data).toParam();
+        let param2 = insert().into('events').set('numParticipants = numParticipants + 1')
+          .where('id = ?', id).toParam();
+        await Promise.all([
+          db.query(param1.text, param1.values),
+          db.query(param2.text, param2.values),
+        ]);
+        return;
+      });
       return { code: 200, message: 'You have joined the event successfully' };
     },
 
     inviteUser: async (_, args, ctx) => {
       let { userId, loaders } = ctx;
-      let { eventsById } = loaders;
+      let { eventsById,
+        eventIsParticipatedByEventAndUser,
+        eventWasInvitedByEventAndUser } = loaders;
       let { params } = args;
       let { id } = params;
-      let [ event, isParticipating, isInvited ] = await Promise.all(
+      let [ event, isParticipating, isInvited ] = await Promise.all([
         eventsById.load(eventId),
-        eventParticipationByEventAndUser.load([ eventId, params.userId ]),
-        eventInvitationByEventAndUser.load([ eventId, params.userId ])
-      );
+        eventIsParticipatedByEventAndUser.load([ eventId, params.userId ]),
+        eventWasInvitedByEventAndUser.load([ eventId, params.userId ])
+      ]);
       if (!event) throw new Error ('Event not found');
       if (event.host_user_id != userId) {
         throw new Error('You can only invite users to your own events')
       }
       if (isParticipating) throw new Error('User is already participating')
       if (isInvited) throw new Error('User is already invited');
-      let data = { event_id: id, user_id: userId };
+      let data = { event_id: id, user_id: userId, created: squel.rstr('NOW()') };
       let { text, values }
-        = insert().into('event_invitations').setFields(data);
+        = insert().into('event_invitations').setFields(data).toParam();
       let result = await db.query(text, values);
       return { code: 200, message: 'You have invited the user successfully' };
     },
@@ -171,8 +189,7 @@ exports.resolver = {
     nextEventRound: async (_, args, ctx) => {
       let { userId, loaders } = ctx;
       let { eventsById } = loaders;
-      let { params } = args;
-      let { id } = params;
+      let { id } = args;
       let event = await eventsById.load(id);
       if (!event || (event && !event.is_public)) throw new Error ('Event not found');
       if (userId !== event.host_user_id) {
@@ -192,11 +209,10 @@ exports.resolver = {
     startEvent: async (_, args, ctx) => {
       let { userId, loaders } = ctx;
       let { eventsById } = loaders;
-      let { params } = args;
-      let { id } = params;
+      let { id } = args;
       let event = await eventsById.load(id);
       if (!event || (event && !event.is_public)) throw new Error ('Event not found');
-      if (userId !== event.host_user_id) {
+      if (userId != event.host_user_id) {
         throw new Error('Only the host can start an event');
       }
       if (event.status != 'Planned') {
@@ -235,36 +251,47 @@ exports.resolver = {
 let generateSchedule = async (event, t) => {
   let { id } = event;
   let batch = [];
-  param = select().field('user_id').from('event_participants').where(
+  let param = select().field('user_id').from('event_participants').where(
     'event_id = ?', event.id
   ).toParam();
-  let [ users ] = await t.query(param);
-  let userIds = users.map(user => user.id);
-  let [ songIds, roundIds ] = await Promise.all([
-    Promise.all(userIds.map(_ => {
-      let { text, values } = insert().into('songs').toParam();
+  let [ userRows ] = await t.query(param.text, param.values);
+  let userIds = userRows.map(({ user_id }) => user_id);
+  let [ songRows, roundRows ] = await Promise.all([
+    Promise.all(userIds.map( (_, idx) => {
+      let { text, values } = insert().into('songs').setFields({ event_id: id }).toParam();
       return t.query(text, values);
     })),
-    Promise.all(userIds.map(_ => {
-      let { text, values } = insert().into('rounds').toParam();
+    Promise.all(userIds.map( (_, idx) => {
+      let { text, values } = insert().into('rounds').setFields({ event_id: id, '`index`': idx }).toParam();
       return t.query(text, values);
     }))
   ]);
-  let square = getRandomLatinSquare(users.length);
+  let songIds = songRows.map(([{ insertId }]) => insertId);
+  let roundIds = roundRows.map(([{ insertId }]) => insertId);
+  param = update().table('events').setFields({
+    num_rounds: userIds.length,
+    status: 'Started',
+    current_round: roundIds[0]
+  }).where('id = ?', id).toParam();
+  batch.push(t.query(param.text, param.values));
+  let square = getRandomLatinSquare(userIds.length);
   let square2
-    = Array(users.length).fill(null).map(r => Array(users.length).fill(null));
+    = Array(userIds.length).fill(null).map(r => Array(userIds.length).fill(null));
   for (let roundIdx = 0; roundIdx < roundIds.length; roundIdx++) {
     for (let songIdx = 0; songIdx < songIds.length; songIdx++) {
       let rsData = {
         event_id: event.id,
         song_id: songIds[songIdx],
-        round_id: roundId[roundIdx],
-        participant: square[songIdx][roundIdx]
+        round_id: roundIds[roundIdx],
+        participant: userIds[square[songIdx][roundIdx]],
+        status: roundIdx == 0 ? 'Started' : 'Planned'
       };
-      param = insert().into('roundsubmissions').setFields(rsData).toParam();
+      let q = insert().into('roundsubmissions').setFields({...rsData});
+      if (roundIdx == 0) q = q.set('file_id_seeded', event.initial_file);
+      param = q.toParam();
       let p = t.query(param.text, param.values);
       square2[songIdx][roundIdx] = p;
-      batch.push(p);
+      batch.push(square2[songIdx][roundIdx]);
       p.then(
         ((songIdx, roundIdx) => async ([{ insertId}]) => {
           let updateData = {};
@@ -281,13 +308,13 @@ let generateSchedule = async (event, t) => {
           }
           await Promise.all(upBatch);
           let { text, values } =
-            update().table('roundsubmissions').setFields(updateData).toParam();
-          batch.push(t.query(param.text, param.values));
+            update().table('roundsubmissions').setFields({...updateData}).toParam();
+          batch.push(t.query(text, values));
         })(songIdx, roundIdx)
       )
     }
   }
-  await Promise.all(batch);
+  await Promise.all([...batch]);
   return true;
 };
 

@@ -7,20 +7,26 @@ db.query = (...args) => {
   return db._query(...args);
 }
 
-// TODO: Important, make sure all queries use the same connection within transaction.
 db.transaction = async (p) => {
-  await db.query('START TRANSACTION');
+  let con = await new Promise(res => {
+    db.pool.getConnection((err, con) => {
+      if (con) res(con);
+      else if(err) throw err;
+    });
+  });
+  await con.query('START TRANSACTION');
   try {
     let promise = p(db);
     let result = await promise;
       await promise.then(
-        async () => await db.query('COMMIT'),
-        async () => await db.query('ROLLBACK')
+        async () => await con.query('COMMIT'),
+        async () => await con.query('ROLLBACK')
       )
     return result;
   } catch (err) {
     console.warn(err);
-    await db.query('ROLLBACK');
+    await con.query('ROLLBACK');
+    throw err;
   }
 }
 

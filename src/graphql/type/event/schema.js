@@ -2,13 +2,17 @@ let baseDefinition = `
   id: ID!
   status: EventStatus!
   created: String!
+  started: String!
+  completed: String!
   name: String!
   description(maxLength: Int): String!
   slug: String!
   currentRound: Round
+  roundsubmissions: [Roundsubmission!]!
+  currentRoundsubmission: Roundsubmission
   numRounds: Int
   numParticipants: Int
-  publicParticipants: [User!]!
+  participants: [User!]!
   host: User
   publicRounds: [Round!]!
   areChangesVisible: Boolean!

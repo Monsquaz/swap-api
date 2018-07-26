@@ -1,9 +1,15 @@
+const squel = require("squel");
+const { select, expr } = squel;
+const and = (...args) => expr().and(...args);
+const or  = (...args) => expr().or( ...args);
 import { truncateWithEllipses } from '../../../util';
 
 const baseResolvers = {
   id: ({ id }) => id,
   status: ({ status }) => status,
   created: ({ created }) => created,
+  started: ({ started }) => started,
+  completed: ({ completed }) => completed,
   name: ({ name }) => name,
   description: ({ description }, { maxLength }) => {
     if (maxLength) return truncateWithEllipses(description, maxLength);
@@ -14,9 +20,54 @@ const baseResolvers = {
     if (!current_round) return null;
     return await ctx.loaders.roundsById.load(current_round)
   },
+  currentRoundsubmission: async ({ id }, args, ctx) => {
+    // TODO: Make into a dataloader, in case we're querying multiple events
+    let { userId, loaders } = ctx;
+    let { sql, roundsubmissionsById } = loaders;
+    let param = select().field('rs.id').from('roundsubmissions', 'rs')
+      .join('events', 'e', 'rs.event_id = e.id')
+      .where(
+          and('e.id = ?', id)
+         .and(
+           or('rs.participant = ?', userId)
+          .or('rs.fill_in_participant = ?', userId)
+         )
+         .and('rs.round_id = e.current_round')
+      ).toParam();
+    let rows = await sql.load(param);
+    console.warn('ROPWS', param);
+    if (rows.length == 0) return null;
+    return await roundsubmissionsById.load(rows[0].id);
+  },
+  roundsubmissions: async ({ id }, args, ctx) => {
+    // TODO: Make into a dataloader, in case we're querying multiple events
+    let { userId, loaders } = ctx;
+    let { sql, roundsubmissionsById } = loaders;
+    let param = select().field('rs.id').from('roundsubmissions', 'rs')
+      .join('events', 'e', 'rs.event_id = e.id')
+      .where(
+          and('e.id = ?', id)
+         .and(
+           or('rs.participant = ?', userId)
+          .or('rs.fill_in_participant = ?', userId)
+          .or(
+             and('e.is_public = 1')
+            .and(
+               or('e.are_changes_visible = 1')
+              .or('e.status = ?', 'Completed')
+            )
+          )
+          .or('e.host_user_id = ?', userId)
+         )
+      ).toParam();
+    let rows = await sql.load(param);
+    return await roundsubmissionsById.loadMany(rows.map(({ id }) => id));
+  },
   numRounds: ({ num_rounds }) => num_rounds,
   numParticipants: ({ num_participants }) => num_participants,
-  publicParticipants: () => { return []; }, // TODO
+  participants: async ({ id }, args, ctx ) => {
+    return await ctx.loaders.participantsByEventId.load(id);
+  },
   host: async ({ host_user_id }, args, ctx) => await ctx.loaders.usersById.load(host_user_id),
   publicRounds: () => null, // TODO
   areChangesVisible: ({ are_changes_visible }) => are_changes_visible,
@@ -48,7 +99,14 @@ exports.resolver = {
       return result;
     }
   },
-  AdministeredEvent: { ...baseResolvers },
+  AdministeredEvent: {
+    ...baseResolvers,
+    initialFile: async ({ initial_file }, args, { userId, loaders }) => {
+      if (!initial_file) return null;
+      if (!userId) return null;
+      return await loaders.filesById.load(initial_file);
+    }
+  },
   ParticipatedEvent: { ...baseResolvers },
   ObservedEvent: { ...baseResolvers }
 };

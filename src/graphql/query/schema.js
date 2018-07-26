@@ -12,13 +12,17 @@ exports.schema = `
     type: 'event',
     sortFields: ['id'],
     directFields: {
-      status: 'EventStatus',
+      slug: 'String',
+      status: '[EventStatus!]',
       isParticipating: 'Boolean',
       isPublic: 'Boolean',
       hostUserId: 'Int'
     },
     numericFields: [
-      ['id', 'Int']
+      ['id', 'Int'],
+      ['created', 'String'],
+      ['started', 'String'],
+      ['completed', 'String']
     ]
   })}
   ${createSelection({
@@ -45,6 +49,10 @@ exports.schema = `
   ${createSelection({
     type: 'user',
     sortFields: ['id'],
+    directFields: {
+      id: '[ID!]',
+      slug: 'String'
+    },
     numericFields: [
       ['id', 'Int']
     ]

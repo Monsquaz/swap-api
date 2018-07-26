@@ -4,7 +4,8 @@ let baseDefinition = `
   round: Round!
   participant: User
   song: Song!
-  file: File
+  fileSeeded: File
+  fileSubmitted: File
   event: Event!
 `;
 

@@ -16,7 +16,10 @@ exports.resolver = {
       let { userId, loaders } = ctx;
       let { sql, eventsById } = loaders;
       let query = select().field('e.id')
-        .field(`SUM(IF(ep.user_id = ${parseInt(userId, 10)}, 1, 0))`, 'participation')
+        .field(
+          userId ? `SUM(IF(ep.user_id = ${parseInt(userId, 10)}, 1, 0))` : '0',
+          'participation'
+        )
         .from('events','e')
         .left_join('event_participants', 'ep', 'e.id = ep.event_id')
         .left_join('event_invitations', 'ei', 'e.id = ei.event_id')
