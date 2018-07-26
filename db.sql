@@ -27,14 +27,14 @@ CREATE TABLE roundsubmissions (
   round_id INT NOT NULL,
   song_id INT NOT NULL,
   status ENUM(
-           'Planned',
-           'Started',
-           'FillInRequested',
-           'FillinAquired',
-           'Submitted',
-           'Completed',
-           'Skipped'
-         ),
+   'Planned',
+   'Started',
+   'FillInRequested',
+   'FillinAquired',
+   'Submitted',
+   'Completed',
+   'Skipped'
+  ),
   participant INT,
   fill_in_participant INT,
   file_id_seeded INT,
@@ -101,4 +101,12 @@ CREATE TABLE event_invitations (
   user_id INT NOT NULL,
   created DATETIME NOT NULL,
   FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE);
+
+CREATE TABLE fill_in_attempts (
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  roundsubmission_id INT NOT NULL,
+  user_id INT NOT NULL,
+  created DATETIME NOT NULL,
+  FOREIGN KEY (roundsubmission_id) REFERENCES roundsubmissions(id) ON UPDATE CASCADE ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE);

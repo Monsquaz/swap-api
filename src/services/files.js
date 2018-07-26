@@ -74,7 +74,7 @@ exports.uploadRoundsubmissionFile = async (req, res) => {
        and('id = ?', id)
       .and(
          or(
-           and('participant = ?', userId)
+            and('participant = ?', userId)
            .and('fill_in_participant IS NULL')
            .and('status IN ?', ['Started','Submitted'])
          )
@@ -85,6 +85,7 @@ exports.uploadRoundsubmissionFile = async (req, res) => {
       )
     ).toParam();
     let [ rows ] = await db.query(text, values);
+    console.warn('COCKD', rows);
     if (rows.length == 0) throw new Error('Access denied');
     //let [ extension ] = file.name.split('.').slice(-1);
     let extension = mime.extension(file.mimetype) || 'file';
