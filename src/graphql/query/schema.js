@@ -10,7 +10,7 @@ exports.query = `
 exports.schema = `
   ${createSelection({
     type: 'event',
-    sortFields: ['id'],
+    sortFields: ['id','status'],
     directFields: {
       slug: 'String',
       status: '[EventStatus!]',

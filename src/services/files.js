@@ -85,31 +85,31 @@ exports.uploadRoundsubmissionFile = async (req, res) => {
       )
     ).toParam();
     let [ rows ] = await db.query(text, values);
-    console.warn('COCKD', rows);
     if (rows.length == 0) throw new Error('Access denied');
     //let [ extension ] = file.name.split('.').slice(-1);
     let extension = mime.extension(file.mimetype) || 'file';
     await db.transaction(async (t) => {
-      let p = insert().into('files');
-      let [{ insertId }] = await t.query(p.text, p.value);
+      let [{ insertId }] = await t.query('INSERT INTO files () VALUES ()');
       let { filename, stats: { size } } = await new Promise((res, rej) => {
-        let filename = `${filesDir}/${insertId}.${extension}`;
-        file.mv(filename, (err) => {
+        let filename = `${insertId}.${extension}`;
+        let filenameFull = `${filesDir}/${filename}`;
+        file.mv(filenameFull, (err) => {
           if (err) throw new Error(err);
-          fs.stat(filename, (err, stats) => {
+          fs.stat(filenameFull, (err, stats) => {
             if (err) throw new Error(err);
             res({ filename, stats });
           });
         });
       });
-      p = update().table('files').setFields({ filename, sizeBytes: size })
+      let p = update().table('files').setFields({ filename, sizeBytes: size })
       .where('id = ?', insertId).toParam();
       let p2 = update().table('roundsubmissions', 'rs').setFields({
-        file_id_submitted: insertId
+        file_id_submitted: insertId,
+        status: 'Submitted'
       }).where('id = ?', id).toParam();
       await Promise.all([
-        await t.query(p.text, p.value),
-        await t.query(p2.text, p2.value)
+        await t.query(p.text, p.values),
+        await t.query(p2.text, p2.values)
       ]);
     });
     res.send('File uploaded!');
@@ -139,6 +139,10 @@ exports.uploadEventFile = async (req, res) => {
     ).toParam();
     let [ rows ] = await db.query(text, values);
     if (rows.length == 0) throw new Error('Access denied');
+    let event = rows[0];
+    if(event.status != 'Planned') {
+      throw new Error('Can\'t change initial file after event has been started');
+    }
     //let [ extension ] = file.name.split('.').slice(-1);
     let extension = mime.extension(file.mimetype) || 'file';
     await db.transaction(async (t) => {

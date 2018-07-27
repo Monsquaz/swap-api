@@ -8,7 +8,7 @@ import slugify from 'slugify';
 const and = (...args) => squel.expr().and(...args);
 const or = (...args) => squel.expr().or(...args);
 import { getRandomLatinSquare } from 'jacobson-matthews-latin-square-js';
-const { select, insert, update } = squel;
+const { select, insert, update, rstr } = squel;
 let _delete = squel.delete;
 import db from '../../../../db';
 import { getMailer, isCaptchaOK } from '../../../util';
@@ -150,7 +150,7 @@ exports.resolver = {
       await db.transaction(async (t) => {
         let data = { event_id: id, user_id: userId, created: squel.rstr('NOW()') };
         let param1 = insert().into('event_participants').setFields(data).toParam();
-        let param2 = insert().into('events').set('numParticipants = numParticipants + 1')
+        let param2 = update().table('events').set('num_participants = num_participants + 1')
           .where('id = ?', id).toParam();
         await Promise.all([
           db.query(param1.text, param1.values),
@@ -188,21 +188,22 @@ exports.resolver = {
 
     nextEventRound: async (_, args, ctx) => {
       let { userId, loaders } = ctx;
-      let { eventsById } = loaders;
+      let { eventsById, roundsById } = loaders;
       let { id } = args;
       let event = await eventsById.load(id);
+      let round = await roundsById.load(event.current_round);
       if (!event || (event && !event.is_public)) throw new Error ('Event not found');
-      if (userId !== event.host_user_id) {
+      if (userId != event.host_user_id) {
         throw new Error('Only the host can force next round');
       }
       switch (event.status) {
         case 'Planned':   throw new Error('Event must be started first');
         case 'Completed': throw new Error('Event is already complete');
       }
-      if (event.current_round >= event.num_rounds) {
+      /* if ((round.index + 1) >= event.num_rounds) {
         throw new Error('There are no more rounds');
-      }
-      await db.transaction(async (t) => { await handleRoundComplete(event, t); });
+      } */
+      await db.transaction(async (t) => { await handleRoundComplete(event, round, t); });
       return { code: 200, message: 'Event is now at round ' + event.current_round };
     },
 
@@ -238,10 +239,7 @@ exports.resolver = {
       return await db.transaction(async (t) => {
         let { text, values } = update().table('events').setFields({status: 'Completed'})
         .where('id = ?', id).toParam();
-        await Promise.all([
-          generateSchedule(event, t),
-          t.query(text, values)
-        ]);
+        await t.query(text, values);
       });
       return { code: 200, message: 'Event was successfully ended' };
     }
@@ -291,9 +289,10 @@ let generateSchedule = async (event, t) => {
       param = q.toParam();
       let p = t.query(param.text, param.values);
       square2[songIdx][roundIdx] = p;
-      batch.push(square2[songIdx][roundIdx]);
+      batch.push(p);
       p.then(
-        ((songIdx, roundIdx) => async ([{ insertId}]) => {
+        ((songIdx, roundIdx) => async ([{ insertId }]) => {
+          let id = insertId;
           let updateData = {};
           let upBatch = [];
           if (roundIdx < (roundIds.length - 1)) {
@@ -308,7 +307,8 @@ let generateSchedule = async (event, t) => {
           }
           await Promise.all(upBatch);
           let { text, values } =
-            update().table('roundsubmissions').setFields({...updateData}).toParam();
+            update().table('roundsubmissions').setFields({...updateData})
+            .where('id = ?', id).toParam();
           batch.push(t.query(text, values));
         })(songIdx, roundIdx)
       )
@@ -318,46 +318,94 @@ let generateSchedule = async (event, t) => {
   return true;
 };
 
-let handleRoundComplete = async (event, t) => {
-  let { id, current_round } = event;
-  let eventUpdate = { current_round: current_round + 1 };
-  let batch = [];
-  let param
-    = update().table('events').setFields(eventUpdate)
-    .where('id = ?', id).toParam();
-  batch.push(t.query(param.text, param.values));
-  param = update().table('roundsubmissions', 'rs')
-    .join('rounds', 'r', 'rs.round_id = r.id')
-    .join('events', 'e', 'rs.event_id = e.id').setFields({
-      'rs.status': 'Completed'
-    }).where(
-       and('rs.status = ?', 'Submitted')
-      .and('r.index = ?', current_round)
-      .and('e.id = ?', id)
-    );
-  batch.push(t.query(param.text, param.values));
-  param = update().table('roundsubmissions', 'rs')
-    .join('rounds', 'r', 'rs.round_id = r.id')
-    .join('events', 'e', 'rs.event_id = e.id').setFields({
-      'rs.status': 'Skipped'
-    }).where(
-      and('rs.status = ?', 'Submitted')
-     .and('r.index = ?', current_round)
-     .and('e.id = ?', id)
-    );
-  batch.push(t.query(param.text, param.values));
-  param = update().table('roundsubmission', 'rs')
-  .join('rounds', 'r', 'rs.round_id = r.id')
-  .join('events', 'e', 'rs.event_id = e.id')
-  .join('roundsubmissions', 'prs', 'rs.previous = prs.id')
-  .set('file_id_seeded = COALESCE(prs.file_id_submitted, prs.file_id_seeded)')
+let handleRoundComplete = async (event, round, t) => {
+  let eventId = event.id;
+  let roundId = round.id;
+  let param = select().field('id').from('rounds')
   .where(
-    and('r.index = ?', current_round + 1)
-   .and('rs.status = ?', 'Submitted')
-   .and('e.id = ?', id)
-  );
-  batch.push(t.query(param.text, param.values));
-  await batch;
+     and('event_id = ?', eventId)
+    .and('`index` = ?', parseInt(round.index,10) + 1)
+  ).toParam();
+  let [ rows ] = await t.query(param.text, param.values);
+  let batch = [];
+  if (rows.length > 0) {
+    let eventUpdate = { current_round: rows[0].id };
+    param = update().table('events').setFields(eventUpdate)
+      .where('id = ?', eventId).toParam();
+    batch.push(t.query(param.text, param.values));
+  }
+  batch.push((async () => {
+    let param = select().field('rs.id').from('roundsubmissions', 'rs')
+      .join('rounds', 'r', 'rs.round_id = r.id')
+      .join('events', 'e', 'rs.event_id = e.id')
+      .where(
+         and('rs.status = ?', 'Submitted')
+        .and('r.index = ?', round.index)
+        .and('e.id = ?', eventId)
+      ).toParam();
+    let [ rows ] = await t.query(param.text, param.values);
+    if (rows.length > 0) {
+      let ids = rows.map(({id}) => id);
+      param = update().table('roundsubmissions').set('status', 'Completed')
+        .where('id IN ?', ids).toParam();
+      await t.query(param.text, param.values);
+    }
+  })());
+  batch.push((async () => {
+    let param = select().field('rs.id').from('roundsubmissions', 'rs')
+      .join('rounds', 'r', 'rs.round_id = r.id')
+      .join('events', 'e', 'rs.event_id = e.id')
+      .where(
+         and('rs.status != ?', 'Submitted')
+        .and('r.index = ?', round.index)
+        .and('e.id = ?', eventId)
+      ).toParam();
+    let [ rows ] = await t.query(param.text, param.values);
+    if (rows.length > 0) {
+      let ids = rows.map(({id}) => id);
+      param = update().table('roundsubmissions').set('status', 'Skipped')
+        .where('id IN ?', ids).toParam();
+      await t.query(param.text, param.values);
+    }
+  })());
+  await Promise.all(batch);
+  param = select()
+    .field('rs.id')
+    .field('COALESCE(prs.file_id_submitted, prs.file_id_seeded)', 'seedFile')
+    .from('roundsubmissions', 'rs')
+    .join('rounds', 'r', 'rs.round_id = r.id')
+    .join('events', 'e', 'rs.event_id = e.id')
+    .join('roundsubmissions', 'prs', 'rs.previous = prs.id')
+    .where(
+      and('r.index = ?', parseInt(round.index) + 1)
+     .and('e.id = ?', eventId)
+   ).toParam();
+  let [ rows2 ] = await t.query(param.text, param.values);
+  if (rows2.length > 0) {
+    let objs = rows2.map(({ id, seedFile }) => ({ id, seedFile }));
+      let batch = [];
+      for (let i = 0; i < objs.length; i++) {
+        param = update().table('roundsubmissions')
+          .setFields({
+            file_id_seeded: objs[i].seedFile,
+            status: 'Started'
+          })
+          .where('id = ?', objs[i].id).toParam();
+        batch.push(t.query(param.text, param.values));
+        if (batch.length > 5) { // Just so we don't overload
+          await Promise.all(batch);
+          batch = [];
+        }
+      }
+      await Promise.all(batch);
+  } else {
+    // The whole event is done.
+    param = update().table('events').setFields({
+      status: 'Completed'
+    }).set('current_round', rstr('NULL'))
+    .where('id = ?', eventId).toParam();
+    await t.query(param.text, param.values);
+  }
 };
 
 let validateFields = (data) => {

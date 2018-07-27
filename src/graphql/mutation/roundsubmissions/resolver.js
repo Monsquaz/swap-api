@@ -16,7 +16,8 @@ exports.resolver = {
       let { roundsubmissionsById, eventsById } = loaders;
       let roundsubmission = await roundsubmissionsById.load(roundsubmissionId);
       let event = await eventsById.load(roundsubmission.event_id);
-      if (roundsubmission.participant != userIdArg) {
+      if (roundsubmission.participant != userIdArg &&
+          roundsubmission.fill_in_participant != userIdArg) {
         if (event.host_user_id != userId) {
           throw new Error('You were not participating in this round');
         }
@@ -40,16 +41,22 @@ exports.resolver = {
           )
           .and(
             'ep.user_id NOT IN ?',
-            select().field('participant').from('roundsubmissions', 'rs').where(
-               and('rs.song_id = ?', roundsubmission.song_id)
-              .and('rs.round_id = ?', roundsubmission.round_id)
+            select().field('participant').from('roundsubmissions', 'rs2').where(
+               and('participant IS NOT NULL')
+              .and(
+                or('rs.song_id = ?', roundsubmission.song_id)
+               .or('rs.round_id = ?', roundsubmission.round_id)
+              )
             )
           )
           .and(
             'ep.user_id NOT IN ?',
-            select().field('fill_in_participant').from('roundsubmissions', 'rs').where(
-               and('rs.song_id = ?', roundsubmission.song_id)
-              .and('rs.round_id = ?', roundsubmission.round_id)
+            select().field('fill_in_participant').from('roundsubmissions', 'rs3').where(
+               and('fill_in_participant IS NOT NULL')
+              .and(
+                or('rs.song_id = ?', roundsubmission.song_id)
+               .or('rs.round_id = ?', roundsubmission.round_id)
+              )
             )
           )
         )
@@ -69,7 +76,8 @@ exports.resolver = {
           };
           param = insert().into('fill_in_attempts').setFields({
             roundsubmission_id: roundsubmission.id,
-            user_id: rows[0].user_id
+            user_id: rows[0].user_id,
+            created: rstr('NOW()')
           }).toParam();
           batch.push(t.query(param.text, param.values));
         } else {
@@ -77,8 +85,9 @@ exports.resolver = {
             status: 'FillInRequested'
           };
         }
-        param = update().table('roundsubmissions', 'rs').setFields(updateData)
-          .where('id = ?', roundsubmissionId).toParam();
+        let query = update().table('roundsubmissions', 'rs').setFields(updateData);
+        if (rows.length == 0) query = query.set('fill_in_participant = NULL');
+        param = query.where('id = ?', roundsubmissionId).toParam();
         batch.push(t.query(param.text, param.values));
         await Promise.all(batch);
       });

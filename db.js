@@ -17,6 +17,7 @@ db.transaction = async (p) => {
   await con.query('START TRANSACTION');
   try {
     // TODO: Should probably be p(con) here. FIX IT and debug why it is not working
+    //let promise = p(db);
     let promise = p(db);
     let result = await promise;
       await promise.then(

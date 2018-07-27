@@ -32,6 +32,7 @@ CREATE TABLE roundsubmissions (
    'FillInRequested',
    'FillinAquired',
    'Submitted',
+   'Refuted',
    'Completed',
    'Skipped'
   ),

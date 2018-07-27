@@ -29,7 +29,10 @@ const baseResolvers = {
       .where(
           and('e.id = ?', id)
          .and(
-           or('rs.participant = ?', userId)
+           or(
+              and('rs.participant = ?', userId)
+             .and('rs.fill_in_participant IS NULL')
+           )
           .or('rs.fill_in_participant = ?', userId)
          )
          .and('rs.round_id = e.current_round')
@@ -48,7 +51,10 @@ const baseResolvers = {
       .where(
           and('e.id = ?', id)
          .and(
-           or('rs.participant = ?', userId)
+           or(
+              and('rs.participant = ?', userId)
+             .and('rs.fill_in_participant IS NULL')
+           )
           .or('rs.fill_in_participant = ?', userId)
           .or(
              and('e.is_public = 1')
@@ -69,7 +75,6 @@ const baseResolvers = {
     return await ctx.loaders.participantsByEventId.load(id);
   },
   host: async ({ host_user_id }, args, ctx) => await ctx.loaders.usersById.load(host_user_id),
-  publicRounds: () => null, // TODO
   areChangesVisible: ({ are_changes_visible }) => are_changes_visible,
   isScheduleVisible: ({ is_schedule_visible }) => is_schedule_visible,
   isPublic: ({ is_public }) => is_public,

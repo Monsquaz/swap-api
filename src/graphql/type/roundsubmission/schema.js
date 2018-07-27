@@ -3,6 +3,7 @@ let baseDefinition = `
   status: RoundSubmissionStatus!
   round: Round!
   participant: User
+  originalParticipant: User
   song: Song!
   fileSeeded: File
   fileSubmitted: File
@@ -29,6 +30,7 @@ exports.schema = `
     FillInRequested,
     FillInAquired,
     Submitted,
+    Refuted,
     Completed,
     Skipped
   }

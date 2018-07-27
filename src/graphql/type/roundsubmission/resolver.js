@@ -1,13 +1,24 @@
 let resolvers = {
   id: ({id}) => id,
-  status: ({status}) => status,
+  status: ({ status }) => status,
   round: async ({ round_id }, args, ctx) => {
     let { userId, loaders } = ctx;
     let { roundsById } = loaders;
     if (!round_id) return null;
     return await roundsById.load(round_id);
   },
-  participant: async ({ participant }, args, ctx) => {
+  participant: async (parent, args, ctx) => {
+    let { participant, fill_in_participant, status } = parent;
+    let { userId, loaders } = ctx;
+    let { usersById } = loaders;
+    if (!participant) return null;
+    return await usersById.load(
+      status == 'FillInRequested' ?
+        participant :
+        fill_in_participant || participant
+    );
+  },
+  originalParticipant: async ({ participant }, args, ctx) => {
     let { userId, loaders } = ctx;
     let { usersById } = loaders;
     if (!participant) return null;

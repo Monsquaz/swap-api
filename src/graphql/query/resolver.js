@@ -92,7 +92,10 @@ exports.resolver = {
       let query = select().field('rs.id').from('roundsubmissions', 'rs')
         .join('events', 'e', 'rs.event_id = e.id')
         .where(
-           or('rs.participant = ?', userId)
+           or(
+              and('rs.participant = ?', userId)
+             .and('rs.fill_in_participant IS NULL')
+           )
           .or('rs.fill_in_participant = ?', userId)
           .or(
              and('e.is_public = 1')
