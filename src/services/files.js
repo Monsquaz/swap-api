@@ -9,7 +9,7 @@ import db from '../../db';
 import { filesDir } from '../../config';
 
 exports.getFile = async (req, res) => {
-  //try {
+  try {
     let { headers } = req;
     let { authorization } = headers;
     if (!authorization) throw new Error('Authorization required');
@@ -50,9 +50,9 @@ exports.getFile = async (req, res) => {
     let { filename, sizeBytes } = rows[0];
     let [ extension ] = filename.split('.').slice(-1);
     res.download(`${filesDir}/${filename}`, `${id}.${extension}`);
-  //} catch (err) {
-    //res.send(err.message);
-  //}
+  } catch (err) {
+    res.send({ code: 500, message: err.message });
+  }
 };
 
 exports.uploadRoundsubmissionFile = async (req, res) => {
@@ -112,9 +112,9 @@ exports.uploadRoundsubmissionFile = async (req, res) => {
         await t.query(p2.text, p2.values)
       ]);
     });
-    res.send('File uploaded!');
+    res.send({ code: 200, message: 'File uploaded!' });
   } catch (err) {
-    res.send(err.message);
+    res.send({ code: 500, message: err.message });
   }
 };
 
@@ -168,8 +168,8 @@ exports.uploadEventFile = async (req, res) => {
         await t.query(p2.text, p2.values)
       ]);
     });
-    res.send('File uploaded!');
+    res.send({ code: 200, message: 'File uploaded!' });
   } catch (err) {
-    res.send(err.message);
+    res.send({ code: 500, message: err.message });
   }
 };

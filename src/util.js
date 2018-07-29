@@ -14,13 +14,19 @@ let applyFilter = (filter, fieldAliases = {}, customFilters = {}) => {
       case 'OR':
         return filter[k].reduce((ack, f) => ack.or(applyFilter(f, fieldAliases, customFilters)), expr);
       case 'NOT':
-        return expr.and('NOT (?)', applyFilter(filter[k], fieldAliases, customFilters));
+        return filter[k].reduce((ack, f) => ack.and('NOT (?)', applyFilter(f, fieldAliases, customFilters)), expr);
       default:
         if (k in customFilters) {
           return customFilters[k](filter[k], expr);
         }
         if (filter[k] === null) return expr; // If null, we default to not filtering
-        let op = Array.isArray(filter[k]) ? 'IN' : '=';
+        let op;
+        if (Array.isArray(filter[k])) {
+          if (filter[k].length == 0) return expr.and('1 = 0'); // Empty list!
+          op = 'IN';
+        } else {
+          op = '=';
+        }
         return expr.and(
           `${fieldAliases && k in fieldAliases ? fieldAliases[k] : k} ${op} ?`,
           filter[k]
@@ -168,6 +174,7 @@ let createSelection = ({ type, directFields, sortFields, numericFields }) => {
     input ${typePluralUc}Filter {
       AND: [${typePluralUc}Filter!]
       OR: [${typePluralUc}Filter!]
+      NOT: [${typePluralUc}Filter!]
       id: ID,
       ${Object.keys(directFields).map(f => `${f}: ${directFields[f]}`).join('\n')}
       ${numericFilters(numericFields)}

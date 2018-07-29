@@ -10,7 +10,17 @@ exports.query = `
 exports.schema = `
   ${createSelection({
     type: 'event',
-    sortFields: ['id','status'],
+    sortFields: [
+      'id',
+      'name',
+      'status',
+      'numParticipants',
+      'numRounds',
+      'isPublic',
+      'isScheduleVisible',
+      'areChangesVisible',
+      'hostUserId'
+    ],
     directFields: {
       slug: 'String',
       status: '[EventStatus!]',
@@ -34,7 +44,11 @@ exports.schema = `
   })}
   ${createSelection({
     type: 'roundsubmission',
-    sortFields: ['id'],
+    sortFields: ['id','songId','roundId'],
+    directFields: {
+      'songId': 'ID',
+      'roundId': 'ID'
+    },
     numericFields: [
       ['id', 'Int']
     ]
@@ -48,7 +62,7 @@ exports.schema = `
   })}
   ${createSelection({
     type: 'user',
-    sortFields: ['id'],
+    sortFields: ['id', 'username'],
     directFields: {
       id: '[ID!]',
       slug: 'String'

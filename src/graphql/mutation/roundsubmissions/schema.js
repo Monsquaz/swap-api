@@ -7,4 +7,5 @@ exports.schema = `
 
 exports.mutation = `
   skipRound(params: RoundSkip!): StatusResponse!
+  refuteRoundsubmission(id: ID!): StatusResponse!
 `;

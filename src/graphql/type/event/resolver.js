@@ -38,7 +38,6 @@ const baseResolvers = {
          .and('rs.round_id = e.current_round')
       ).toParam();
     let rows = await sql.load(param);
-    console.warn('ROPWS', param);
     if (rows.length == 0) return null;
     return await roundsubmissionsById.load(rows[0].id);
   },

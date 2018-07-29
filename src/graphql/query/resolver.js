@@ -43,7 +43,11 @@ exports.resolver = {
         query,
         fieldAliases: {
           isPublic: 'is_public',
-          hostUserId: 'host_user_id'
+          hostUserId: 'host_user_id',
+          numParticipants: 'num_participants',
+          numRounds: 'num_rounds',
+          isScheduleVisible: 'is_schedule_visible',
+          areChangesVisible: 'are_changes_visible'
         },
         customFilters: {
           isParticipating: (value, expr) => expr // Handled above
@@ -109,7 +113,10 @@ exports.resolver = {
       query = performSelection({
         query,
         fieldAliases: {
-          eventId: 'e.id'
+          id: 'rs.id',
+          eventId: 'e.id',
+          roundId: 'rs.round_id',
+          songId: 'rs.song_id'
         },
         selection
      });

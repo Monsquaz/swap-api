@@ -45,7 +45,7 @@ let resolvers = {
   event: async ({ event_id }, args, ctx) => {
     let { userId, loaders } = ctx;
     let { eventsById } = loaders;
-    if (!event) return null;
+    if (!event_id) return null;
     return await eventsById.load(event_id);
   },
 };

@@ -41,7 +41,8 @@ exports.resolver = {
         host_user_id: userId,
         are_changes_visible: areChangesVisible,
         is_schedule_visible: isScheduleVisible,
-        is_public: isPublic
+        is_public: isPublic,
+        num_participants: 0
       };
       let fields = { ...formatParameters(data) };
       let { text, values }
@@ -219,6 +220,9 @@ exports.resolver = {
       if (event.status != 'Planned') {
         throw new Error('Event was already started');
       }
+      if (event.num_participants <= 1) {
+        throw new Error('There has to be more than one participant')
+      }
       await db.transaction(async (t) => generateSchedule(event, t));
       return { code: 200, message: 'Event was started successfully' };
     },
@@ -256,7 +260,7 @@ let generateSchedule = async (event, t) => {
   let userIds = userRows.map(({ user_id }) => user_id);
   let [ songRows, roundRows ] = await Promise.all([
     Promise.all(userIds.map( (_, idx) => {
-      let { text, values } = insert().into('songs').setFields({ event_id: id }).toParam();
+      let { text, values } = insert().into('songs').setFields({ event_id: id, '`index`': idx }).toParam();
       return t.query(text, values);
     })),
     Promise.all(userIds.map( (_, idx) => {
