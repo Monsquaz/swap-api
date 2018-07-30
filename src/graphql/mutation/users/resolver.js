@@ -142,7 +142,7 @@ let validateFields = (data) => {
         if (v.length < 1) return [ ...ack, "lastname is too short" ];
         return ack;
       case 'username':
-        if (!validator.isAlpha(v)) return [ ...ack, "username must be alphanumeric" ];
+        if (!validator.isAlphanumeric(v)) return [ ...ack, "username must be alphanumeric" ];
         return ack;
       case 'password':
         if (strength(v) < 2) return [ ...ack, "Password is not strong enough" ]

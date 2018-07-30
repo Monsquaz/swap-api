@@ -144,6 +144,7 @@ exports.resolver = {
         eventWasInvitedByEventAndUser.load([ id, userId ])
       ]);
       if (!event) throw new Error('Event does not exist.');
+      if (event.status == 'Completed') throw new Error('Event is already completed');
       if (!event.is_public && !isInvited && event.host_user_id != userId) {
         throw new Error('Event does not exist.')
       }
@@ -153,9 +154,31 @@ exports.resolver = {
         let param1 = insert().into('event_participants').setFields(data).toParam();
         let param2 = update().table('events').set('num_participants = num_participants + 1')
           .where('id = ?', id).toParam();
+        let p3 = (async () => {
+          let param3 = select().field('rs.id')
+            .from('roundsubmissions', 'rs')
+            .join('rounds','r','rs.round_id = r.id')
+            .where(
+               and('rs.event_id = ?', id)
+              .and('rs.status = ?', 'FillInRequested')
+            )
+            .order('r.`index`')
+            .order('RAND()')
+            .limit(1).toParam();
+          let [ rows ] = await t.query(param3.text, param3.values);
+          if (rows.length == 1) {
+            param3 = update().table('roundsubmissions').setFields({
+              fill_in_participant: userId,
+              status: 'FillInAquired'
+            })
+            .where('id = ?', rows[0].id).toParam();
+            await t.query(param3.text, param3.values);
+          }
+        })();
         await Promise.all([
           db.query(param1.text, param1.values),
           db.query(param2.text, param2.values),
+          p3
         ]);
         return;
       });

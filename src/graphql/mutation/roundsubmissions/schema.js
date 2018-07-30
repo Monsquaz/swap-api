@@ -1,11 +1,6 @@
-exports.schema = `
-  input RoundSkip {
-    roundsubmissionId: ID!
-    userId: ID
-  }
-`;
+exports.schema = ``;
 
 exports.mutation = `
-  skipRound(params: RoundSkip!): StatusResponse!
+  skipRoundsubmission(id: ID!): StatusResponse!
   refuteRoundsubmission(id: ID!): StatusResponse!
 `;

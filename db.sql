@@ -30,7 +30,7 @@ CREATE TABLE roundsubmissions (
    'Planned',
    'Started',
    'FillInRequested',
-   'FillinAquired',
+   'FillInAquired',
    'Submitted',
    'Refuted',
    'Completed',

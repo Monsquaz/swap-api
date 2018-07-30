@@ -8,6 +8,18 @@ const resolvers = {
     let url = `https://www.gravatar.com/avatar/${hash}`;
     if (size) return `${url}?s=${size}`;
     else return url;
+  },
+  participatedEvents: async (user, args, ctx) => {
+    let { userId, loaders } = ctx;
+    let { participatedEventsByUserIdAuthed } = loaders;
+    // TODO: Create dataloader!
+    return events;
+  },
+  hostedEvents: async (user, args, ctx) => {
+    let { userId, loaders } = ctx;
+    let { hostedEventsByUserIdAuthed } = loaders;
+    // TODO: Create dataloader!
+    return events;
   }
 };
 

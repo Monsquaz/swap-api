@@ -8,7 +8,6 @@ import db from '../../../../db';
 
 exports.resolver = {
   Mutation: {
-
     refuteRoundsubmission: async (_, args, ctx) => {
       let { id } = args;
       let { userId, loaders } = ctx;
@@ -32,20 +31,18 @@ exports.resolver = {
         message: 'You have refuted the submission successfully'
       };
     },
-
-    skipRound: async (_, args, ctx) => {
-      let { params } = args;
-      let { roundsubmissionId } = params;
+    skipRoundsubmission: async (_, args, ctx) => {
+      let { id } = args;
       let { userId, loaders } = ctx;
-      let userIdArg = params.userId || userId;
       let { roundsubmissionsById, eventsById } = loaders;
-      let roundsubmission = await roundsubmissionsById.load(roundsubmissionId);
+      let roundsubmission = await roundsubmissionsById.load(id);
       let event = await eventsById.load(roundsubmission.event_id);
-      if (roundsubmission.participant != userIdArg &&
-          roundsubmission.fill_in_participant != userIdArg) {
-        if (event.host_user_id != userId) {
-          throw new Error('You were not participating in this round');
-        }
+      let participant =
+        roundsubmission.fill_in_participant ||
+        roundsubmission.participant;
+      if (userId != participant &&
+          userId != event.host_user_id) {
+        throw new Error('Not allowed.')
       }
       let param = select()
         .field('ep.user_id')
@@ -55,9 +52,10 @@ exports.resolver = {
         .join('roundsubmissions', 'rs', 'e.id = rs.event_id')
         .left_join('fill_in_attempts', 'fia', 'rs.id = fia.roundsubmission_id')
         .where(
-           and('e.id = ?', event.id)
+           and('e.id = ?', roundsubmission.event_id)
           .and('rs.id = ?', roundsubmission.id)
-          .and('ep.user_id != ?', userIdArg)
+          .and('ep.user_id != ?', roundsubmission.fill_in_participant ||
+                                  roundsubmission.participant)
           .and(
             'ep.user_id NOT IN ?',
             select().field('user_id').from('fill_in_attempts', 'fia2').where(
@@ -69,8 +67,8 @@ exports.resolver = {
             select().field('participant').from('roundsubmissions', 'rs2').where(
                and('participant IS NOT NULL')
               .and(
-                or('rs.song_id = ?', roundsubmission.song_id)
-               .or('rs.round_id = ?', roundsubmission.round_id)
+                or('rs2.song_id = ?', roundsubmission.song_id)
+               .or('rs2.round_id = ?', roundsubmission.round_id)
               )
             )
           )
@@ -79,8 +77,8 @@ exports.resolver = {
             select().field('fill_in_participant').from('roundsubmissions', 'rs3').where(
                and('fill_in_participant IS NOT NULL')
               .and(
-                or('rs.song_id = ?', roundsubmission.song_id)
-               .or('rs.round_id = ?', roundsubmission.round_id)
+                or('rs3.song_id = ?', roundsubmission.song_id)
+               .or('rs3.round_id = ?', roundsubmission.round_id)
               )
             )
           )
@@ -112,7 +110,7 @@ exports.resolver = {
         }
         let query = update().table('roundsubmissions', 'rs').setFields(updateData);
         if (rows.length == 0) query = query.set('fill_in_participant = NULL');
-        param = query.where('id = ?', roundsubmissionId).toParam();
+        param = query.where('id = ?', roundsubmission.id).toParam();
         batch.push(t.query(param.text, param.values));
         await Promise.all(batch);
       });

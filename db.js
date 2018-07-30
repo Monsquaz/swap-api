@@ -8,26 +8,49 @@ db.query = (...args) => {
 }
 
 db.transaction = async (p) => {
+  // No transactions for now
+  return await p(db);
+
+  // TODO: Fix this shit?
   let con = await new Promise(res => {
     db.pool.getConnection((err, con) => {
-      if (con) res(con);
-      else if(err) throw err;
+      if (err) {
+        if (con) {
+          con.release();
+        }
+        throw err;
+      }
+      res(con);
     });
   });
   await con.query('START TRANSACTION');
   try {
-    // TODO: Should probably be p(con) here. FIX IT and debug why it is not working
-    //let promise = p(db);
-    let promise = p(db);
+    let c = {
+      query: (...args) => new Promise((resolve, reject) => {
+        con.query(...args, (err, result) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve([result]);
+        })
+      })
+    }
+    let promise = p(c);
     let result = await promise;
-      await promise.then(
-        async () => await con.query('COMMIT'),
-        async () => await con.query('ROLLBACK')
-      )
+    await promise.then(
+      async () => {
+        await con.query('COMMIT')
+      },
+      async () => {
+        await con.query('ROLLBACK')
+      }
+    );
+    con.release();
     return result;
   } catch (err) {
     console.warn(err);
     await con.query('ROLLBACK');
+    con.release();
     throw err;
   }
 }

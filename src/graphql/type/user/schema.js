@@ -3,6 +3,8 @@ let baseDefinition = `
   slug: String!
   username: String!
   gravatar(size: Int): String!
+  participatedEvents: [Event!]!
+  hostedEvents: [Event!]!
 `
 
 exports.schema = `
