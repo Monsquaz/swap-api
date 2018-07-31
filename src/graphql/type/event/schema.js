@@ -28,7 +28,8 @@ exports.schema = `
   enum EventStatus {
     Planned,
     Started,
-    Completed
+    Completed,
+    Published
   }
   type AdministeredEvent implements Event {
     ${baseDefinition}

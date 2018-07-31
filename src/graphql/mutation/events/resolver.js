@@ -11,7 +11,7 @@ import { getRandomLatinSquare } from 'jacobson-matthews-latin-square-js';
 const { select, insert, update, rstr } = squel;
 let _delete = squel.delete;
 import db from '../../../../db';
-import { getMailer, isCaptchaOK } from '../../../util';
+import { getMailer, isCaptchaOK, findFillIn } from '../../../util';
 
 exports.resolver = {
   Mutation: {
@@ -127,7 +127,9 @@ exports.resolver = {
         case 'Started': {
           // TODO: Should it be allowed?
         }
-        case 'Completed': throw new Error('Event already completed');
+        case 'Completed':
+        case 'Published':
+          throw new Error('Event already completed');
       }
       return { code: 200, message: 'Participant removed successfully' };
     },
@@ -144,7 +146,9 @@ exports.resolver = {
         eventWasInvitedByEventAndUser.load([ id, userId ])
       ]);
       if (!event) throw new Error('Event does not exist.');
-      if (event.status == 'Completed') throw new Error('Event is already completed');
+      if (['Completed','Published'].includes(event.status)) {
+        throw new Error('Event is already completed');
+      }
       if (!event.is_public && !isInvited && event.host_user_id != userId) {
         throw new Error('Event does not exist.')
       }
@@ -155,7 +159,7 @@ exports.resolver = {
         let param2 = update().table('events').set('num_participants = num_participants + 1')
           .where('id = ?', id).toParam();
         let p3 = (async () => {
-          let param3 = select().field('rs.id')
+          let param3 = select().field('rs.*')
             .from('roundsubmissions', 'rs')
             .join('rounds','r','rs.round_id = r.id')
             .where(
@@ -164,16 +168,15 @@ exports.resolver = {
             )
             .order('r.`index`')
             .order('RAND()')
-            .limit(1).toParam();
-          let [ rows ] = await t.query(param3.text, param3.values);
-          if (rows.length == 1) {
-            param3 = update().table('roundsubmissions').setFields({
-              fill_in_participant: userId,
-              status: 'FillInAquired'
-            })
-            .where('id = ?', rows[0].id).toParam();
-            await t.query(param3.text, param3.values);
-          }
+            .toParam();
+
+           let [ roundsubmissions ] = await db.query(param3.text, param3.values);
+           console.warn('ROUNDSUBMISSIONS', roundsubmissions);
+           for (let i = 0; i < roundsubmissions.length; i++) {
+             console.warn('--------- ATTEMPT TO FILL IN FOR', roundsubmissions[i].id)
+             await findFillIn(roundsubmissions[i]);
+           }
+
         })();
         await Promise.all([
           db.query(param1.text, param1.values),
@@ -222,11 +225,8 @@ exports.resolver = {
       }
       switch (event.status) {
         case 'Planned':   throw new Error('Event must be started first');
-        case 'Completed': throw new Error('Event is already complete');
+        case 'Completed': case 'Published': throw new Error('Event is already complete');
       }
-      /* if ((round.index + 1) >= event.num_rounds) {
-        throw new Error('There are no more rounds');
-      } */
       await db.transaction(async (t) => { await handleRoundComplete(event, round, t); });
       return { code: 200, message: 'Event is now at round ' + event.current_round };
     },
@@ -250,6 +250,7 @@ exports.resolver = {
       return { code: 200, message: 'Event was started successfully' };
     },
 
+    // TODO publishEvent
     endEvent: async (_, args, ctx) => {
       let { userId, loaders } = ctx;
       let { eventsById } = loaders;
@@ -261,7 +262,7 @@ exports.resolver = {
       }
       switch (event.status) {
         case 'Planned':   throw new Error('Event has not even been started yet');
-        case 'Completed': throw new Error('Event has already been ended');
+        case 'Completed': case 'Published': throw new Error('Event has already been ended');
       }
       return await db.transaction(async (t) => {
         let { text, values } = update().table('events').setFields({status: 'Completed'})
@@ -397,7 +398,7 @@ let handleRoundComplete = async (event, round, t) => {
   })());
   await Promise.all(batch);
   param = select()
-    .field('rs.id')
+    .field('rs.*')
     .field('COALESCE(prs.file_id_submitted, prs.file_id_seeded)', 'seedFile')
     .from('roundsubmissions', 'rs')
     .join('rounds', 'r', 'rs.round_id = r.id')
@@ -407,18 +408,26 @@ let handleRoundComplete = async (event, round, t) => {
       and('r.index = ?', parseInt(round.index) + 1)
      .and('e.id = ?', eventId)
    ).toParam();
-  let [ rows2 ] = await t.query(param.text, param.values);
-  if (rows2.length > 0) {
-    let objs = rows2.map(({ id, seedFile }) => ({ id, seedFile }));
+  let [ roundsubmissions ] = await t.query(param.text, param.values);
+  if (roundsubmissions.length > 0) {
       let batch = [];
-      for (let i = 0; i < objs.length; i++) {
-        param = update().table('roundsubmissions')
-          .setFields({
-            file_id_seeded: objs[i].seedFile,
-            status: 'Started'
-          })
-          .where('id = ?', objs[i].id).toParam();
-        batch.push(t.query(param.text, param.values));
+      for (let i = 0; i < roundsubmissions.length; i++) {
+        switch (roundsubmissions[i].status) {
+          case 'Planned': {
+            param = update().table('roundsubmissions')
+              .setFields({
+                file_id_seeded: roundsubmissions[i].seedFile,
+                status: 'Started'
+              })
+              .where('id = ?', roundsubmissions[i].id).toParam();
+            batch.push(t.query(param.text, param.values));
+            break;
+          }
+          case 'FillInRequested': {
+            await findFillIn(roundsubmissions[i]);
+            break;
+          }
+        }
         if (batch.length > 5) { // Just so we don't overload
           await Promise.all(batch);
           batch = [];

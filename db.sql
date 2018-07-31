@@ -64,7 +64,8 @@ CREATE TABLE events (
   status ENUM(
            'Planned',
            'Started',
-           'Completed'
+           'Completed',
+           'Published'
          ) NOT NULL DEFAULT 'Planned',
   current_round INT,
   num_rounds INT,

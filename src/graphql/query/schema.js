@@ -19,14 +19,16 @@ exports.schema = `
       'isPublic',
       'isScheduleVisible',
       'areChangesVisible',
-      'hostUserId'
+      'hostUserId',
+      'participantUserId'
     ],
     directFields: {
       slug: 'String',
       status: '[EventStatus!]',
       isParticipating: 'Boolean',
       isPublic: 'Boolean',
-      hostUserId: 'Int'
+      hostUserId: 'ID',
+      participantUserId: 'ID'
     },
     numericFields: [
       ['id', 'Int'],

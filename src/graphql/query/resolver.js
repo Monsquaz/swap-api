@@ -42,12 +42,13 @@ exports.resolver = {
       query = performSelection({
         query,
         fieldAliases: {
-          isPublic: 'is_public',
-          hostUserId: 'host_user_id',
-          numParticipants: 'num_participants',
-          numRounds: 'num_rounds',
-          isScheduleVisible: 'is_schedule_visible',
-          areChangesVisible: 'are_changes_visible'
+          isPublic: 'e.is_public',
+          hostUserId: 'e.host_user_id',
+          participantUserId: 'ep.user_id',
+          numParticipants: 'e.num_participants',
+          numRounds: 'e.num_rounds',
+          isScheduleVisible: 'e.is_schedule_visible',
+          areChangesVisible: 'e.are_changes_visible'
         },
         customFilters: {
           isParticipating: (value, expr) => expr // Handled above
@@ -73,7 +74,7 @@ exports.resolver = {
              and('e.is_public = 1')
             .and(
                or('e.are_changes_visible = 1')
-              .or('e.status = ?', 'Completed')
+              .or('e.status = ?', 'Published')
             )
           )
           .or('e.host_user_id = ?', userId)
@@ -105,7 +106,7 @@ exports.resolver = {
              and('e.is_public = 1')
             .and(
                or('e.are_changes_visible = 1')
-              .or('e.status = ?', 'Completed')
+              .or('e.status = ?', 'Published')
             )
           )
           .or('e.host_user_id = ?', userId)
@@ -139,7 +140,7 @@ exports.resolver = {
              and('e.is_public = 1')
             .and(
                or('e.are_changes_visible = 1')
-              .or('e.status = ?', 'Completed')
+              .or('e.status = ?', 'Published')
             )
           )
           .or('e.host_user_id = ?', userId)

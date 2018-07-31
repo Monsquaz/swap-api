@@ -33,7 +33,7 @@ server.start({
 // Additional services
 server.express.use(fileUpload({
   limits: { fileSize: 20 * 1024 * 1024 },
-  safeFileNames: true,
+  safeFileNames: false,
   abortOnLimit: true
 }));
 server.express.get('/files/:id', getFile);

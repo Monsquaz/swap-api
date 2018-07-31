@@ -59,12 +59,16 @@ const baseResolvers = {
              and('e.is_public = 1')
             .and(
                or('e.are_changes_visible = 1')
-              .or('e.status = ?', 'Completed')
+              .or('e.status = ?', 'Published')
             )
           )
           .or('e.host_user_id = ?', userId)
          )
-      ).toParam();
+      )
+      .order('rs.round_id')
+      .order('rs.song_id')
+      .order('rs.id')
+      .toParam();
     let rows = await sql.load(param);
     return await roundsubmissionsById.loadMany(rows.map(({ id }) => id));
   },

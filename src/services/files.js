@@ -33,7 +33,7 @@ exports.getFile = async (req, res) => {
           .or(
              and('es.is_public = 1')
             .and(
-               or('es.status = ?', 'Completed')
+               or('es.status = ?', 'Published')
               .or('es.are_changes_visible = 1')
             )
           )
@@ -69,25 +69,28 @@ exports.uploadRoundsubmissionFile = async (req, res) => {
     let { id } = req.params;
     if (String(parseInt(id, 10)) != id) throw new Error('id must be an integer');
     if (id <= 0) throw new Error('id must be positive and non-zero');
-    let { text, values } = select().from('roundsubmissions', 'rs')
+    let { text, values } = select()
+    .from('roundsubmissions', 'rs')
+    .join('events', 'e', 'rs.event_id = e.id')
     .where(
-       and('id = ?', id)
+       and('rs.id = ?', id)
+      .and('rs.round_id = e.current_round')
       .and(
          or(
-            and('participant = ?', userId)
-           .and('fill_in_participant IS NULL')
-           .and('status IN ?', ['Started','Submitted'])
+            and('rs.participant = ?', userId)
+           .and('rs.fill_in_participant IS NULL')
+           .and('rs.status IN ?', ['Started','Submitted'])
          )
         .or(
-           and('fill_in_participant = ?', userId)
-          .and('status IN ?', ['FillInAquired','Submitted'])
+           and('rs.fill_in_participant = ?', userId)
+          .and('rs.status IN ?', ['FillInAquired','Submitted'])
         )
       )
     ).toParam();
     let [ rows ] = await db.query(text, values);
     if (rows.length == 0) throw new Error('Access denied');
-    //let [ extension ] = file.name.split('.').slice(-1);
-    let extension = mime.extension(file.mimetype) || 'file';
+    let [ extension ] = file.name.split('.').slice(-1);
+    if (!extension) extension = mime.extension(file.mimetype) || 'file';
     await db.transaction(async (t) => {
       let [{ insertId }] = await t.query('INSERT INTO files () VALUES ()');
       let { filename, stats: { size } } = await new Promise((res, rej) => {
@@ -143,8 +146,8 @@ exports.uploadEventFile = async (req, res) => {
     if(event.status != 'Planned') {
       throw new Error('Can\'t change initial file after event has been started');
     }
-    //let [ extension ] = file.name.split('.').slice(-1);
-    let extension = mime.extension(file.mimetype) || 'file';
+    let [ extension ] = file.name.split('.').slice(-1);
+    if (!extension) extension = mime.extension(file.mimetype) || 'file';
     await db.transaction(async (t) => {
       let [{ insertId }] = await t.query('INSERT INTO files () VALUES ()');
       let { filename, stats: { size } } = await new Promise((res, rej) => {
