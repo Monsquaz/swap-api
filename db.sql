@@ -2,7 +2,7 @@ CREATE TABLE files (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   filename VARCHAR(255) UNIQUE,
   sizeBytes INT
-);
+) CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE TABLE users (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -13,14 +13,15 @@ CREATE TABLE users (
   lastname VARCHAR(100) NOT NULL,
   password VARCHAR(128) NOT NULL,
   activation_status TINYINT(4) NOT NULL,
-  activation_code VARCHAR(128) NOT NULL
-);
+  activation_code VARCHAR(128) NOT NULL,
+  password_reset_code VARCHAR(128) NOT NULL DEFAULT ''
+) CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE TABLE rounds (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   event_id INT NOT NULL,
   `index` INT NOT NULL
-);
+) CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE TABLE roundsubmissions (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -43,7 +44,7 @@ CREATE TABLE roundsubmissions (
   previous INT,
   next INT,
   event_id INT NOT NULL
-);
+) CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 ALTER TABLE roundsubmissions ADD FOREIGN KEY (previous) REFERENCES roundsubmissions (id) ON UPDATE CASCADE ON DELETE SET NULL;
 ALTER TABLE roundsubmissions ADD FOREIGN KEY (next) REFERENCES roundsubmissions (id) ON UPDATE CASCADE ON DELETE SET NULL;
@@ -65,7 +66,8 @@ CREATE TABLE events (
            'Planned',
            'Started',
            'Completed',
-           'Published'
+           'Published',
+           'Cancelled'
          ) NOT NULL DEFAULT 'Planned',
   current_round INT,
   num_rounds INT,
@@ -75,18 +77,20 @@ CREATE TABLE events (
   is_schedule_visible TINYINT(4) NOT NULL,
   is_public TINYINT(4) NOT NULL,
   initial_file INT
-);
+) CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 ALTER TABLE events ADD FOREIGN KEY (initial_file) REFERENCES files (id) ON UPDATE CASCADE ON DELETE SET NULL;
 ALTER TABLE events ADD FOREIGN KEY (host_user_id) REFERENCES users (id) ON UPDATE CASCADE ON DELETE SET NULL;
 ALTER TABLE `events` ADD FOREIGN KEY (`current_round`) REFERENCES `rounds` (`id`) ON UPDATE CASCADE ON DELETE SET NULL;
 ALTER TABLE rounds ADD FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE;
 
+ALTER TABLE roundsubmissions ADD FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE;
+
 CREATE TABLE songs (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   event_id INT NOT NULL,
   `index` INT NOT NULL
-);
+) CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 ALTER TABLE songs ADD FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE;
 
@@ -96,7 +100,8 @@ CREATE TABLE event_participants (
   user_id INT NOT NULL,
   created DATETIME NOT NULL,
   FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE);
+  FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE
+) CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE TABLE event_invitations (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -104,7 +109,8 @@ CREATE TABLE event_invitations (
   user_id INT NOT NULL,
   created DATETIME NOT NULL,
   FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE);
+  FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE
+) CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE TABLE fill_in_attempts (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -112,4 +118,5 @@ CREATE TABLE fill_in_attempts (
   user_id INT NOT NULL,
   created DATETIME NOT NULL,
   FOREIGN KEY (roundsubmission_id) REFERENCES roundsubmissions(id) ON UPDATE CASCADE ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE);
+  FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE
+) CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;

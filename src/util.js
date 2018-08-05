@@ -60,21 +60,18 @@ exports.uniqT = uniqT;
 
 exports.truncateWithEllipses = (text, max) => text.substr(0,max-1)+(text.length>max?'&hellip;':'');
 
-/*
+
 exports.getMailer = () => {
-  return nodemailer.createTransport({
-    sendmail: true,
-    newline: 'unix',
-    path: '/usr/sbin/sendmail'
-  });
-};*/
+  return nodemailer.createTransport(config.nodemailer);
+};
 
 // Temp. For debugging.
+/*
 exports.getMailer = () => ({
   sendMail: (data) => {
     console.warn('sendMail: ', data)
   }
-});
+});*/
 
 import reCaptcha from 'recaptcha2';
 
@@ -132,7 +129,9 @@ exports.findFillIn = async (roundsubmission) => {
       )
     )
     .group('ep.user_id')
+    .group('ep.id')
     .order('numFillins')
+    .order('ep.id')
     .order('RAND()')
     .limit(1)
     .toParam();

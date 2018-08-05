@@ -29,7 +29,8 @@ exports.schema = `
     Planned,
     Started,
     Completed,
-    Published
+    Published,
+    Cancelled
   }
   type AdministeredEvent implements Event {
     ${baseDefinition}

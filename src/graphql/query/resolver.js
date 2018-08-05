@@ -161,7 +161,13 @@ exports.resolver = {
       let { userId, loaders } = ctx;
       let { sql, usersById } = loaders;
       let query = select().field('id').from('users');
-      query = performSelection({ query, selection });
+      query = performSelection({
+        query,
+        fieldAliases: {
+          passwordResetCode: 'password_reset_code'
+        },
+        selection
+      });
       let param = query.toParam();
       let rows = await sql.load(param);
       return await usersById.loadMany(rows.map(({ id }) => id));

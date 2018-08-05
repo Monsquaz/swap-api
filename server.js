@@ -8,8 +8,11 @@ import {
   uploadEventFile
 } from './src/services/files';
 import fileUpload from 'express-fileupload';
+import config from './config';
+import fs from 'fs';
 
-const { schema, resolver } = glue('src/graphql');
+process.chdir(__dirname);
+const { schema, resolver } = glue(`src/graphql`);
 
 const server = new GraphQLServer({
   typeDefs: schema,
@@ -27,7 +30,11 @@ const server = new GraphQLServer({
 });
 
 server.start({
-  deduplicator: true
+  deduplicator: true,
+  https: {
+    key: fs.readFileSync('./ssl/privkey.pem'),
+    cert: fs.readFileSync('./ssl/fullchain.pem')
+  }
 },() => console.log('Server is running on localhost:4000'));
 
 // Additional services

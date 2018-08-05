@@ -113,6 +113,11 @@ exports.resolver = {
       if (!initial_file) return null;
       if (!userId) return null;
       return await loaders.filesById.load(initial_file);
+    },
+    invitedUsers: async (event, args, ctx) => {
+      let { userId, loaders } = ctx;
+      let { invitedUsersByEvent } = loaders;
+      return await invitedUsersByEvent.load(event.id);
     }
   },
   ParticipatedEvent: { ...baseResolvers },

@@ -1,12 +1,14 @@
 exports.mutation = `
   createEvent(params: EventCreation!): StatusResponse!
   startEvent(id: ID!): StatusResponse!
-  endEvent(id: ID!): StatusResponse!
+  publishEvent(id: ID!): StatusResponse!
   updateEvent(params: EventUpdate!): StatusResponse!
   removeParticipantFromEvent(params: EventParticipantRemoval!): StatusResponse!
   joinEvent(id: ID!): StatusResponse!
   inviteUser(params: EventInvitation!): StatusResponse!
   nextEventRound(id: ID!): StatusResponse!
+  leaveEvent(id: ID!): StatusResponse!
+  cancelEvent(id: ID!): StatusResponse!
 `;
 
 exports.schema = `
@@ -27,8 +29,8 @@ exports.schema = `
     isPublic: Boolean
   }
   input EventInvitation {
-    id: ID!
-    userId: Int!
+    eventId: ID!
+    userId: ID!
   }
   input EventParticipantRemoval {
     eventId: ID!

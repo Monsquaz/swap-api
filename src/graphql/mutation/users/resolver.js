@@ -7,7 +7,9 @@ import slugify from 'slugify';
 import nodemailer from 'nodemailer';
 import config from '../../../../config';
 import squel from 'squel';
-const { insert, update  } = squel;
+const and = (...args) => squel.expr().and(...args);
+const or = (...args) => squel.expr().or(...args);
+const { select, insert, update, rstr } = squel;
 import jwt from 'jsonwebtoken';
 import db from '../../../../db';
 import { getMailer, isCaptchaOK } from '../../../util';
@@ -28,7 +30,7 @@ exports.resolver = {
       if (validationMessages.length > 0) {
         throw new Error('Validation error: ' + validationMessages.join(', '));
       }
-      let [byEmail, byUsername] = await Promise.all([
+      let [ byEmail, byUsername ] = await Promise.all([
         usersByEmail.load(email), usersByUsername.load(username)
       ]);
       if (byEmail) {
@@ -50,18 +52,73 @@ exports.resolver = {
         = insert().into('users').setFields(data).toParam();
       let [{ insertId }] = await db.query(text, values);
       let mailer = getMailer();
+      let url =
+        `${config.siteUrl}/users/${insertId}/activation/${activation_code}`;
       mailer.sendMail({
         from: 'swap@monsquaz.org',
         to: email,
         subject: 'User registration: Almost done',
         text: `Hi ${firstname}!` + '\n' +
           'Thank you for registering at Monsquaz Swap.\n' +
-          'To complete your registration, all you need to do is visit this link\n\n' +
-          `<a href="${config.siteUrl}/users/${insertId}/activation/${activation_code}"></a>` + '\n\n' +
+          'To complete your registration, all you need to do is visit this URL\n\n' +
+          `${url}` + '\n\n' +
           'Regards,\n' +
           'Monsquaz Swap'
       });
       return { code: 200, message: 'User created successfully' }
+    },
+
+    requestPasswordReset: async (_, args, ctx) => {
+      let { usernameOrEmail } = args;
+      let param = select().field('*').from('users').where(
+         or('username = ?', usernameOrEmail)
+        .or('email = ?', usernameOrEmail)
+      ).toParam();
+      let [ rows ] = await db.query(param.text, param.values);
+      if (rows.length != 1) throw new Error('User not found');
+      let user = rows[0];
+      if (user.activation_status == 0) throw new Error('User was not activated yet');
+      let code = getGeneratedVerificationCode(48);
+      param = update().table('users').set('password_reset_code = ?', code)
+        .where('id = ?', user.id).toParam();
+      await db.query(param.text, param.values);
+      let url = `${config.siteUrl}/forgot-password?code=${code}`;
+      let mailer = getMailer();
+      console.warn('user', user);
+      mailer.sendMail({
+        from: 'swap@monsquaz.org',
+        to: user.email,
+        subject: 'Password reset request',
+        text: 'Hi ' + user.firstname + '!' + '\n' +
+          'Someone - most likely and hopefully you - has requested to reset your password.' + '\n' +
+          'If you want to continue resetting your password, visit the following URL:' + '\n' +
+          `${url}` + '\n\n' +
+          'Regards,' + '\n' +
+          'Monsquaz Swap'
+      });
+      return { code: 200, message: 'Reset link was sent to the user via email' };
+    },
+
+    updateUserPassword: async (_, args, ctx) => {
+      let { params } = args;
+      let { code, userId, password } = params;
+      let { loaders } = ctx;
+      let { usersById } = loaders;
+      if (strength(password) < 2) {
+        throw new Error('Password is not strong enough');
+      }
+      let user = await usersById.load(userId);
+      if (!userId) throw new Error('User doesn\'t exist');
+      if (!code) throw new Error ('No valid reset code');
+      if (code != user.password_reset_code) {
+        throw new Error('Incorrect password reset code');
+      }
+      let { text, values }
+        = update().table('users').setFields({
+          password: phpPassword.hash(password)
+        }).where('id = ?', user.id).toParam();
+      await db.query(text, values);
+      return { code: 200, message: 'Password has been updated' };
     },
 
     verifyUser: async(_, args, ctx) => {
@@ -128,18 +185,20 @@ exports.resolver = {
   }
 };
 
+const stripHtml = t => t.replace(/<(?:.|\n)*?>/gm, '');
+
 let validateFields = (data) => {
   return Object.keys(data).reduce((ack, k) => {
     let v = data[k];
     switch (k) {
       case 'email':
-        if (!validator.isEmail(v)) return [ ...ack, "Invalid email address" ];
+        if (!validator.isEmail(stripHtml(v))) return [ ...ack, "Invalid email address" ];
         return ack;
       case 'firstname':
-        if (v.length < 1) return [ ...ack, "firstname is too short" ];
+        if (stripHtml(v).length < 1) return [ ...ack, "firstname is too short" ];
         return ack;
       case 'lastname':
-        if (v.length < 1) return [ ...ack, "lastname is too short" ];
+        if (stripHtml(v).length < 1) return [ ...ack, "lastname is too short" ];
         return ack;
       case 'username':
         if (!validator.isAlphanumeric(v)) return [ ...ack, "username must be alphanumeric" ];
@@ -161,7 +220,7 @@ let formatParameters = (params) => {
       case 'firstname':
       case 'lastname':
       case 'username':
-        return { ...ack, [k]: v.trim() };
+        return { ...ack, [k]: v.trim().replace(/<(?:.|\n)*?>/gm, '') };
       case 'password': return { ...ack, password: phpPassword.hash(v)};
       default:
         return ack;

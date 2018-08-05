@@ -12,12 +12,38 @@ exports.getFile = async (req, res) => {
   try {
     let { headers } = req;
     let { authorization } = headers;
-    if (!authorization) throw new Error('Authorization required');
-    let userId = getUserIdFromToken(authorization);
-    if (!userId) throw new Error('Could not find user');
+    let userId = null;
+    if (authorization) {
+      userId = getUserIdFromToken(authorization);
+    }
     let { id } = req.params;
     if (String(parseInt(id, 10)) != id) throw new Error('id must be an integer');
     if (id <= 0) throw new Error('id must be positive and non-zero');
+    let where2 =
+      or(
+         and('es.is_public = 1')
+        .and(
+           or('es.status = ?', 'Published')
+          .or('es.are_changes_visible = 1')
+        )
+      )
+      .or(
+         and('esu.is_public = 1')
+        .and(
+           or('esu.status = ?', 'Published')
+          .or('esu.are_changes_visible = 1')
+        )
+      );
+    if (userId) {
+      where2 = where2
+       .or('e.host_user_id = ?', userId)
+       .or('? IN (rsse.participant, rsse.fill_in_participant)', userId)
+       .or(
+          and('rssu.participant = ?', userId)
+         .and('rssu.fill_in_participant IS NULL')
+       )
+       .or('rssu.fill_in_participant = ?', userId)
+    }
     let { text, values } = select()
       .field('f.filename')
       .field('f.sizeBytes')
@@ -26,25 +52,13 @@ exports.getFile = async (req, res) => {
       .left_join('roundsubmissions', 'rsse', 'f.id = rsse.file_id_seeded')
       .left_join('events', 'es', 'rsse.event_id = es.id')
       .left_join('roundsubmissions', 'rssu', 'f.id = rssu.file_id_submitted')
+      .left_join('events', 'esu', 'rssu.event_id = esu.id')
       .where(
          and('f.id = ?', id)
-        .and(
-           or('e.host_user_id = ?', userId)
-          .or(
-             and('es.is_public = 1')
-            .and(
-               or('es.status = ?', 'Published')
-              .or('es.are_changes_visible = 1')
-            )
-          )
-          .or('? IN (rsse.participant, rsse.fill_in_participant)', userId)
-          .or(
-             and('rssu.participant = ?', userId)
-            .and('rssu.fill_in_participant IS NULL')
-          )
-          .or('rssu.fill_in_participant = ?', userId)
-        )
-      ).toParam();
+        .and(where2)
+      )
+      .limit(1)
+      .toParam();
     let [ rows ] = await db.query(text, values);
     if (rows.length == 0) throw new Error('File not found');
     let { filename, sizeBytes } = rows[0];

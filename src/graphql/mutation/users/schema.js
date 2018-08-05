@@ -4,6 +4,8 @@ exports.mutation = `
   deleteUser(id: ID!): StatusResponse!
   verifyUser(params: UserVerification!): StatusResponse!
   loginUser(params: LoginCredentials!): LoginResponse!
+  requestPasswordReset(usernameOrEmail: String!): StatusResponse!
+  updateUserPassword(params: UserPasswordUpdate!): StatusResponse!
 `;
 
 exports.schema = `
@@ -23,11 +25,16 @@ exports.schema = `
     lastname: String
   }
   input UserVerification {
-    id: ID!,
+    id: ID!
     code: String!
   }
   input LoginCredentials {
     username: String!
+    password: String!
+  }
+  input UserPasswordUpdate {
+    code: String!
+    userId: ID!
     password: String!
   }
   type LoginResponse {

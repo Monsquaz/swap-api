@@ -67,7 +67,9 @@ exports.schema = `
     sortFields: ['id', 'username'],
     directFields: {
       id: '[ID!]',
-      slug: 'String'
+      slug: 'String',
+      username: 'String',
+      passwordResetCode: 'String'
     },
     numericFields: [
       ['id', 'Int']

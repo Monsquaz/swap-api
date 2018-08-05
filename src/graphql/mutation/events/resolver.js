@@ -60,7 +60,7 @@ exports.resolver = {
       } = params;
       let event = await eventsById.load(id);
       if (!event) throw new Error ('Event not found');
-      if (userId !== event.host_user_id) {
+      if (userId != event.host_user_id) {
         throw new Error('You can only update your own events');
       }
       let validationMessages = validateFields(params);
@@ -85,6 +85,22 @@ exports.resolver = {
         = update().table('events').setFields(fields).where('id = ?', id).toParam();
       let result = await db.query(text, values);
       return { code: 200, message: 'Event updated successfully' };
+    },
+
+    cancelEvent: async (_, args, ctx) => {
+      let { userId, loaders } = ctx;
+      let { eventsById } = loaders;
+      let { id } = args;
+      let event = await eventsById.load(id);
+      if (!event) throw new Error ('Event not found');
+      if (userId != event.host_user_id) {
+        throw new Error('You can only update your own events');
+      }
+      if (event.status != 'Planned') throw new Error('Event can\'t be cancelled if started.');
+      let { text, values }
+        = update().table('events').set('status = ?', 'Cancelled').where('id = ?', id).toParam();
+      let result = await db.query(text, values);
+      return { code: 200, message: 'Event cancelled successfully' };
     },
 
     removeParticipantFromEvent: async (_, args, ctx) => {
@@ -134,6 +150,44 @@ exports.resolver = {
       return { code: 200, message: 'Participant removed successfully' };
     },
 
+    leaveEvent: async (_, args, ctx) => {
+      let { userId, loaders } = ctx;
+      let { eventsById,
+        eventIsParticipatedByEventAndUser } = loaders;
+      let { id } = args;
+      let [ event, isParticipating ] = await Promise.all([
+        eventsById.load(id),
+        eventIsParticipatedByEventAndUser.load([ id, userId ])
+      ]);
+      if (!event) throw new Error('Event does not exist.');
+      //if (event.host_user_id == userId) throw new Error('You can\'t leave your own event');
+      let param = select().field('rs.*')
+        .from('roundsubmissions', 'rs')
+        .join('rounds','r','rs.round_id = r.id')
+        .where(
+           and('rs.event_id = ?', id)
+          .and('? IN (rs.participant, rs.fill_in_participant)', userId)
+        )
+        .toParam();
+       let [ roundsubmissions ] = await db.query(param.text, param.values);
+       if (roundsubmissions.length > 0) {
+         throw new Error('You can\'t leave since you were part of the schedule');
+       }
+       param = _delete().from('event_participants')
+         .where(
+            and('event_id = ?', id)
+           .and('user_id = ?', userId)
+         ).toParam();
+       let [{ affectedRows }] = await db.query(param.text, param.values);
+       if (affectedRows > 0) {
+         param = update().table('events').set('num_participants = num_participants - ?', affectedRows)
+           .where('id = ?', id)
+           .toParam();
+       }
+       await db.query(param.text, param.values);
+       return { code: 200, message: "You have left the event" };
+    },
+
     joinEvent: async (_, args, ctx) => {
       let { userId, loaders } = ctx;
       let { eventsById,
@@ -169,14 +223,10 @@ exports.resolver = {
             .order('r.`index`')
             .order('RAND()')
             .toParam();
-
            let [ roundsubmissions ] = await db.query(param3.text, param3.values);
-           console.warn('ROUNDSUBMISSIONS', roundsubmissions);
            for (let i = 0; i < roundsubmissions.length; i++) {
-             console.warn('--------- ATTEMPT TO FILL IN FOR', roundsubmissions[i].id)
              await findFillIn(roundsubmissions[i]);
            }
-
         })();
         await Promise.all([
           db.query(param1.text, param1.values),
@@ -194,7 +244,7 @@ exports.resolver = {
         eventIsParticipatedByEventAndUser,
         eventWasInvitedByEventAndUser } = loaders;
       let { params } = args;
-      let { id } = params;
+      let { eventId } = params;
       let [ event, isParticipating, isInvited ] = await Promise.all([
         eventsById.load(eventId),
         eventIsParticipatedByEventAndUser.load([ eventId, params.userId ]),
@@ -206,7 +256,7 @@ exports.resolver = {
       }
       if (isParticipating) throw new Error('User is already participating')
       if (isInvited) throw new Error('User is already invited');
-      let data = { event_id: id, user_id: userId, created: squel.rstr('NOW()') };
+      let data = { event_id: eventId, user_id: params.userId, created: squel.rstr('NOW()') };
       let { text, values }
         = insert().into('event_invitations').setFields(data).toParam();
       let result = await db.query(text, values);
@@ -219,7 +269,7 @@ exports.resolver = {
       let { id } = args;
       let event = await eventsById.load(id);
       let round = await roundsById.load(event.current_round);
-      if (!event || (event && !event.is_public)) throw new Error ('Event not found');
+      if (!event) throw new Error ('Event not found');
       if (userId != event.host_user_id) {
         throw new Error('Only the host can force next round');
       }
@@ -247,29 +297,29 @@ exports.resolver = {
         throw new Error('There has to be more than one participant')
       }
       await db.transaction(async (t) => generateSchedule(event, t));
+      emailCurrentRoundParticipants(event, 0);
       return { code: 200, message: 'Event was started successfully' };
     },
 
-    // TODO publishEvent
-    endEvent: async (_, args, ctx) => {
+    publishEvent: async (_, args, ctx) => {
       let { userId, loaders } = ctx;
       let { eventsById } = loaders;
       let { id } = args;
       let event = await eventsById.load(id);
       if (!event || (event && !event.is_public)) throw new Error ('Event not found');
-      if (userId !== event.host_user_id) {
-        throw new Error('Only the host can end an event');
+      if (userId != event.host_user_id) {
+        throw new Error('Only the host can publish an event');
       }
-      switch (event.status) {
-        case 'Planned':   throw new Error('Event has not even been started yet');
-        case 'Completed': case 'Published': throw new Error('Event has already been ended');
+      if (event.status != 'Completed') {
+        throw new Error('Only events with status Completed can be published');
       }
-      return await db.transaction(async (t) => {
-        let { text, values } = update().table('events').setFields({status: 'Completed'})
+      await db.transaction(async (t) => {
+        let { text, values } = update().table('events').setFields({status: 'Published'})
         .where('id = ?', id).toParam();
         await t.query(text, values);
       });
-      return { code: 200, message: 'Event was successfully ended' };
+      emailEventWasPublished(event);
+      return { code: 200, message: 'Event was successfully published' };
     }
   }
 };
@@ -317,32 +367,33 @@ let generateSchedule = async (event, t) => {
       param = q.toParam();
       let p = t.query(param.text, param.values);
       square2[songIdx][roundIdx] = p;
-      batch.push(p);
-      p.then(
-        ((songIdx, roundIdx) => async ([{ insertId }]) => {
-          let id = insertId;
-          let updateData = {};
-          let upBatch = [];
-          if (roundIdx < (roundIds.length - 1)) {
-            let up = square2[songIdx][roundIdx + 1];
-            up.then(([{ insertId }]) => { updateData.next = insertId; })
-            upBatch.push(up);
-          }
-          if (roundIdx > 0) {
-            let up = square2[songIdx][roundIdx - 1];
-            up.then(([{ insertId }]) => { updateData.previous = insertId; })
-            upBatch.push(up);
-          }
-          await Promise.all(upBatch);
-          let { text, values } =
-            update().table('roundsubmissions').setFields({...updateData})
-            .where('id = ?', id).toParam();
-          batch.push(t.query(text, values));
-        })(songIdx, roundIdx)
-      )
+      batch.push(
+        p.then(
+          ((songIdx, roundIdx) => async ([{ insertId }]) => {
+            let id = insertId;
+            let updateData = {};
+            let upBatch = [];
+            if (roundIdx < (roundIds.length - 1)) {
+              let up = square2[songIdx][roundIdx + 1];
+              up.then(([{ insertId }]) => { updateData.next = insertId; })
+              upBatch.push(up);
+            }
+            if (roundIdx > 0) {
+              let up = square2[songIdx][roundIdx - 1];
+              up.then(([{ insertId }]) => { updateData.previous = insertId; })
+              upBatch.push(up);
+            }
+            await Promise.all(upBatch);
+            let { text, values } =
+              update().table('roundsubmissions').setFields({...updateData})
+              .where('id = ?', id).toParam();
+            return await t.query(text, values);
+          })(songIdx, roundIdx)
+        )
+      );
     }
   }
-  await Promise.all([...batch]);
+  await Promise.all(batch);
   return true;
 };
 
@@ -434,6 +485,7 @@ let handleRoundComplete = async (event, round, t) => {
         }
       }
       await Promise.all(batch);
+      emailCurrentRoundParticipants(event, round.index + 1);
   } else {
     // The whole event is done.
     param = update().table('events').setFields({
@@ -441,14 +493,111 @@ let handleRoundComplete = async (event, round, t) => {
     }).set('current_round', rstr('NULL'))
     .where('id = ?', eventId).toParam();
     await t.query(param.text, param.values);
+    emailEventWasCompleted(event);
   }
 };
+
+let emailCurrentRoundParticipants = async (event, roundIndex) => {
+  let { text, values } = select().field('u.firstname').field('u.email')
+  .from('roundsubmissions', 'rs')
+  .join('events', 'e', 'rs.event_id = e.id')
+  .join('users', 'u', 'COALESCE(rs.fill_in_participant, rs.participant) = u.id')
+  .where(
+     and('rs.event_id = ?', event.id)
+    .and('e.current_round = rs.round_id')
+  ).toParam();
+  let [ rows ] = await db.query(text, values);
+  let mailer = getMailer();
+  let url =
+    `${config.siteUrl}/events/${event.slug}`;
+  await rows.reduce((ack, user) => {
+    return ack.then(() => new Promise(res => {
+      mailer.sendMail({
+        from: 'swap@monsquaz.org',
+        to: user.email,
+        subject: `${event.name}: R${roundIndex + 1}${(roundIndex + 1) == event.num_rounds ? ' (FINAL)' : ''}`,
+        text: `Hi ${user.firstname}!` + '\n' +
+          `The ${roundIndex == 0 ? 'first' : ((roundIndex + 1) == event.num_rounds ? 'final' : 'next')} ` +
+          `round of ${event.name} has now started` + '\n\n' +
+          'Go to\n' +
+          `${url}` + '\n\n' +
+          'To see what\'s going on\n\n' +
+          'Regards,\n' +
+          'Monsquaz Swap'
+      }, () => {
+        setTimeout(() => { res(); }, 5000)
+      })
+    }));
+  }, Promise.all([]));
+};
+
+let emailEventWasCompleted = async (event) => {
+  let { text, values } = select().distinct().field('u.firstname').field('u.email')
+  .from('roundsubmissions', 'rs')
+  .join('events', 'e', 'rs.event_id = e.id')
+  .join('users', 'u', 'COALESCE(rs.fill_in_participant, rs.participant) = u.id')
+  .where(
+     and('rs.event_id = ?', event.id)
+  ).toParam();
+  let [ rows ] = await db.query(text, values);
+  let mailer = getMailer();
+  await rows.reduce((ack, user) => {
+    return ack.then(() => new Promise(res => {
+      mailer.sendMail({
+        from: 'swap@monsquaz.org',
+        to: user.email,
+        subject: `${event.name} was completed`,
+        text: `Hi ${user.firstname}!` + '\n' +
+          `The event has been completed` + '\n\n' +
+          'Regards,\n' +
+          'Monsquaz Swap'
+      }, () => {
+        setTimeout(() => { res(); }, 5000)
+      })
+    }));
+  }, Promise.all([]));
+};
+
+let emailEventWasPublished = async (event) => {
+  let { text, values } = select().distinct().field('u.firstname').field('u.email')
+  .from('roundsubmissions', 'rs')
+  .join('events', 'e', 'rs.event_id = e.id')
+  .join('users', 'u', 'COALESCE(rs.fill_in_participant, rs.participant) = u.id')
+  .where(
+     and('rs.event_id = ?', event.id)
+  ).toParam();
+  let [ rows ] = await db.query(text, values);
+  let mailer = getMailer();
+  let url =
+    `${config.siteUrl}/events/${event.slug}`;
+  await rows.reduce((ack, user) => {
+    return ack.then(() => new Promise(res => {
+      mailer.sendMail({
+        from: 'swap@monsquaz.org',
+        to: user.email,
+        subject: `${event.name} has been published`,
+        text: `Hi ${user.firstname}!` + '\n' +
+          `The event has been published - meaning, it is now possible to go through all edits and write comments to them.` + '\n\n' +
+          'Go to\n' +
+          `${url}` + '\n\n' +
+          'To see what\'s going on\n\n' +
+          'Regards,\n' +
+          'Monsquaz Swap'
+      }, () => {
+        setTimeout(() => { res(); }, 5000)
+      })
+    }));
+  }, Promise.all([]));
+};
+
+const stripHtml = t => t.replace(/<(?:.|\n)*?>/gm, '');
 
 let validateFields = (data) => {
   return Object.keys(data).reduce((ack, k) => {
     let v = data[k];
     switch (k) {
       case 'name':
+        if (v.length == 0) return [ ...ack, "Name must be set" ];
         if (!/^[A-Za-z\d ]+$/.test(v)) return [ ...ack, "Name must contain only alphanumerical characters or spaces" ];
         return ack;
       default:
@@ -464,7 +613,7 @@ let formatParameters = (params) => {
       case 'name':
       case 'slug':
       case 'description':
-        return { ...ack, [k]: v.trim() };
+        return { ...ack, [k]: v.trim().replace(/<(?:.|\n)*?>/gm, '') };
       default:
         return ack;
     }
