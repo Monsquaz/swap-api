@@ -48,12 +48,12 @@ exports.resolver = {
       let { text, values }
         = insert().into('events').setFields(fields).toParam();
       let [{ insertId }] = await db.query(text, values);
-      return { code: 200, message: 'Event created successfully' }
+      return { ...fields, id: insertId };
     },
 
     updateEvent: async (_, args, ctx) => {
-      let { userId, loaders } = ctx;
-      let { eventsById, eventsBySlug } = loaders;
+      let { userId, loaders, pubSub } = ctx;
+      let { eventsById, eventsBySlug, usersById } = loaders;
       let { params } = args;
       let {
         id, name, description, areChangesVisible, isScheduleVisible, isPublic
@@ -83,13 +83,21 @@ exports.resolver = {
       let fields = { ...formatParameters(data) };
       let { text, values }
         = update().table('events').setFields(fields).where('id = ?', id).toParam();
-      let result = await db.query(text, values);
+      await db.query(text, values);
+      let user = await usersById.load(userId);
+      pubSub.publish('eventsChanged', { eventsChanged: [event] });
+      pubSub.publish(`event${event.id}Changed`, {
+        eventChanged: {
+          event,
+          message: `${user.username} has updated ${event.name}`
+        }
+      });
       return { code: 200, message: 'Event updated successfully' };
     },
 
     cancelEvent: async (_, args, ctx) => {
-      let { userId, loaders } = ctx;
-      let { eventsById } = loaders;
+      let { userId, loaders, pubSub } = ctx;
+      let { eventsById, usersById } = loaders;
       let { id } = args;
       let event = await eventsById.load(id);
       if (!event) throw new Error ('Event not found');
@@ -100,16 +108,25 @@ exports.resolver = {
       let { text, values }
         = update().table('events').set('status = ?', 'Cancelled').where('id = ?', id).toParam();
       let result = await db.query(text, values);
+      let user = await usersById.load(userId);
+      pubSub.publish('eventsChanged', { eventsChanged: [event] });
+      pubSub.publish(`event${event.id}Changed`, {
+        eventChanged: {
+          event,
+          message: `${user.username} has cancelled ${event.name}`
+        }
+      });
       return { code: 200, message: 'Event cancelled successfully' };
     },
 
     removeParticipantFromEvent: async (_, args, ctx) => {
-      let { userId, loaders } = ctx;
+      let { userId, loaders, pubSub } = ctx;
       let { eventsById, usersById } = loaders;
       let { params } = args;
       let { eventId } = params;
       let participantId = params.userId; // Can't destructure; userId is us!
-      let [ participant, event, isParticipating ] = await Promise.all(
+      let [ host, participant, event, isParticipating ] = await Promise.all(
+        usersById.load(userId),
         usersById.load(participantId),
         eventsById.load(eventId),
         eventParticipationByEventAndUser.load([eventId, participantId])
@@ -147,15 +164,29 @@ exports.resolver = {
         case 'Published':
           throw new Error('Event already completed');
       }
+      let message;
+      if (userId == participantId) {
+        message = `${participant.username} has left ${event.name}`;
+      } else {
+        message = `${participant.username} has been removed from ${event.name} by ${host.username}`;
+      }
+      pubSub.publish('eventsChanged', { eventsChanged: [event] });
+      pubSub.publish(`event${event.id}Changed`, {
+        eventChanged: {
+          event,
+          message
+        }
+      });
       return { code: 200, message: 'Participant removed successfully' };
     },
 
     leaveEvent: async (_, args, ctx) => {
-      let { userId, loaders } = ctx;
+      let { userId, loaders, pubSub } = ctx;
       let { eventsById,
-        eventIsParticipatedByEventAndUser } = loaders;
+        eventIsParticipatedByEventAndUser, usersById } = loaders;
       let { id } = args;
-      let [ event, isParticipating ] = await Promise.all([
+      let [ user, event, isParticipating ] = await Promise.all([
+        usersById.load(userId),
         eventsById.load(id),
         eventIsParticipatedByEventAndUser.load([ id, userId ])
       ]);
@@ -185,16 +216,24 @@ exports.resolver = {
            .toParam();
        }
        await db.query(param.text, param.values);
+       pubSub.publish('eventsChanged', { eventsChanged: [event] });
+       pubSub.publish(`event${event.id}Changed`, {
+         eventChanged: {
+           event,
+           message: `${user.username} has left ${event.name}`
+         }
+       });
        return { code: 200, message: "You have left the event" };
     },
 
     joinEvent: async (_, args, ctx) => {
-      let { userId, loaders } = ctx;
+      let { userId, loaders, pubSub } = ctx;
       let { eventsById,
         eventIsParticipatedByEventAndUser,
-        eventWasInvitedByEventAndUser } = loaders;
+        eventWasInvitedByEventAndUser, usersById } = loaders;
       let { id } = args;
-      let [ event, isParticipating, isInvited ] = await Promise.all([
+      let [ user, event, isParticipating, isInvited ] = await Promise.all([
+        usersById.load(userId),
         eventsById.load(id),
         eventIsParticipatedByEventAndUser.load([ id, userId ]),
         eventWasInvitedByEventAndUser.load([ id, userId ])
@@ -235,17 +274,26 @@ exports.resolver = {
         ]);
         return;
       });
+      pubSub.publish('eventsChanged', { eventsChanged: [event] });
+      pubSub.publish(`event${event.id}Changed`, {
+        eventChanged: {
+          event,
+          message: `${user.username} has joined ${event.name}`
+        }
+      });
       return { code: 200, message: 'You have joined the event successfully' };
     },
 
     inviteUser: async (_, args, ctx) => {
-      let { userId, loaders } = ctx;
+      let { userId, loaders, pubSub } = ctx;
       let { eventsById,
         eventIsParticipatedByEventAndUser,
-        eventWasInvitedByEventAndUser } = loaders;
+        eventWasInvitedByEventAndUser, usersById } = loaders;
       let { params } = args;
       let { eventId } = params;
-      let [ event, isParticipating, isInvited ] = await Promise.all([
+      let [ host, user, event, isParticipating, isInvited ] = await Promise.all([
+        usersById.load(userId),
+        usersById.load(params.userId),
         eventsById.load(eventId),
         eventIsParticipatedByEventAndUser.load([ eventId, params.userId ]),
         eventWasInvitedByEventAndUser.load([ eventId, params.userId ])
@@ -260,11 +308,18 @@ exports.resolver = {
       let { text, values }
         = insert().into('event_invitations').setFields(data).toParam();
       let result = await db.query(text, values);
-      return { code: 200, message: 'You have invited the user successfully' };
+      pubSub.publish('eventsChanged', { eventsChanged: [event] });
+      pubSub.publish(`event${event.id}Changed`, {
+        eventChanged: {
+          event,
+          message: `${host.username} has invited ${user.username} to join ${event.name}`
+        }
+      });
+      return { code: 200, message: `You have invited the ${user.username} successfully` };
     },
 
     nextEventRound: async (_, args, ctx) => {
-      let { userId, loaders } = ctx;
+      let { userId, loaders, pubSub } = ctx;
       let { eventsById, roundsById } = loaders;
       let { id } = args;
       let event = await eventsById.load(id);
@@ -278,11 +333,24 @@ exports.resolver = {
         case 'Completed': case 'Published': throw new Error('Event is already complete');
       }
       await db.transaction(async (t) => { await handleRoundComplete(event, round, t); });
-      return { code: 200, message: 'Event is now at round ' + event.current_round };
+      let message;
+      if ((round.index + 1) == event.num_rounds) {
+        message = `${event.name} has completed it's last round`;
+      } else {
+        message = `${event.name} has now transitioned to round ${round.index + 2}`;
+      }
+      pubSub.publish('eventsChanged', { eventsChanged: [event] });
+      pubSub.publish(`event${event.id}Changed`, {
+        eventChanged: {
+          event,
+          message
+        }
+      });
+      return { code: 200, message };
     },
 
     startEvent: async (_, args, ctx) => {
-      let { userId, loaders } = ctx;
+      let { userId, loaders, pubSub } = ctx;
       let { eventsById } = loaders;
       let { id } = args;
       let event = await eventsById.load(id);
@@ -298,11 +366,18 @@ exports.resolver = {
       }
       await db.transaction(async (t) => generateSchedule(event, t));
       emailCurrentRoundParticipants(event, 0);
+      pubSub.publish('eventsChanged', { eventsChanged: [event] });
+      pubSub.publish(`event${event.id}Changed`, {
+        eventChanged: {
+          event,
+          message: `${event.name} has been started`
+        }
+      });
       return { code: 200, message: 'Event was started successfully' };
     },
 
     publishEvent: async (_, args, ctx) => {
-      let { userId, loaders } = ctx;
+      let { userId, loaders, pubSub } = ctx;
       let { eventsById } = loaders;
       let { id } = args;
       let event = await eventsById.load(id);
@@ -319,6 +394,13 @@ exports.resolver = {
         await t.query(text, values);
       });
       emailEventWasPublished(event);
+      pubSub.publish('eventsChanged', { eventsChanged: [event] });
+      pubSub.publish(`event${event.id}Changed`, {
+        eventChanged: {
+          event,
+          message: `${event.name} has been published`
+        }
+      });
       return { code: 200, message: 'Event was successfully published' };
     }
   }

@@ -1,5 +1,5 @@
 exports.mutation = `
-  createEvent(params: EventCreation!): StatusResponse!
+  createEvent(params: EventCreation!): Event!
   startEvent(id: ID!): StatusResponse!
   publishEvent(id: ID!): StatusResponse!
   updateEvent(params: EventUpdate!): StatusResponse!

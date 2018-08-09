@@ -1,4 +1,4 @@
-import { GraphQLServer } from 'graphql-yoga'
+import { GraphQLServer, PubSub } from 'graphql-yoga'
 import glue from 'schemaglue';
 import { createLoaders } from './src/loaders';
 import { getUserIdFromToken } from './src/util';
@@ -11,21 +11,27 @@ import fileUpload from 'express-fileupload';
 import config from './config';
 import fs from 'fs';
 
+const pubSub = new PubSub();
+
 process.chdir(__dirname);
 const { schema, resolver } = glue(`src/graphql`);
 
 const server = new GraphQLServer({
   typeDefs: schema,
   resolvers: resolver,
-  context: ({ request, response }) => {
-    let { headers } = request;
-    let { authorization } = headers;
+  context: (params) => {
+    let { request } = params;
+    let authorization = null;
+    if (request) {
+      let { headers } = request;
+      authorization = headers.authorization;
+    }
     let userId = null;
     let loaders = createLoaders();
     if (authorization) {
       userId = getUserIdFromToken(authorization);
     }
-    return { userId, loaders };
+    return { userId, loaders, pubSub };
   }
 });
 
@@ -44,5 +50,5 @@ server.express.use(fileUpload({
   abortOnLimit: true
 }));
 server.express.get('/files/:id', getFile);
-server.express.post('/roundsubmissions/:id/file', uploadRoundsubmissionFile);
-server.express.post('/events/:id/file', uploadEventFile);
+server.express.post('/roundsubmissions/:id/file', uploadRoundsubmissionFile(pubSub));
+server.express.post('/events/:id/file', uploadEventFile(pubSub));

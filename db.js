@@ -9,7 +9,7 @@ db.query = (...args) => {
 
 db.transaction = async (p) => {
   // No transactions for now
-  return await p(db);
+  //return await p(db);
 
   // TODO: Fix this shit?
   let con = await new Promise(res => {
@@ -23,6 +23,8 @@ db.transaction = async (p) => {
       res(con);
     });
   });
+  await con.query('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+  console.warn('- START TRANSACTION - ');
   await con.query('START TRANSACTION');
   try {
     let c = {
@@ -39,9 +41,11 @@ db.transaction = async (p) => {
     let result = await promise;
     await promise.then(
       async () => {
+        console.warn(' - COMMIT - ');
         await con.query('COMMIT')
       },
       async () => {
+        console.warn(' - ROLLBACK - ');
         await con.query('ROLLBACK')
       }
     );
@@ -49,6 +53,7 @@ db.transaction = async (p) => {
     return result;
   } catch (err) {
     console.warn(err);
+    console.warn(' - ROLLBACK - ');
     await con.query('ROLLBACK');
     con.release();
     throw err;

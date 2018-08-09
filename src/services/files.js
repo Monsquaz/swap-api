@@ -7,6 +7,7 @@ import mime from 'mime-to-extensions';
 import { getUserIdFromToken } from '../util';
 import db from '../../db';
 import { filesDir } from '../../config';
+import { createLoaders } from '../loaders';
 
 exports.getFile = async (req, res) => {
   try {
@@ -69,8 +70,10 @@ exports.getFile = async (req, res) => {
   }
 };
 
-exports.uploadRoundsubmissionFile = async (req, res) => {
+exports.uploadRoundsubmissionFile = pubSub => async (req, res) => {
   try {
+    let loaders = createLoaders();
+    let { eventsById, usersById, roundsById, roundsubmissionsById } = loaders;
     let { headers, files } = req;
     let { authorization } = headers;
     if (!authorization) throw new Error('Authorization required');
@@ -129,14 +132,29 @@ exports.uploadRoundsubmissionFile = async (req, res) => {
         await t.query(p2.text, p2.values)
       ]);
     });
+    let roundsubmission = await roundsubmissionsById.load(id);
+    let [ event, round, participant ] = await Promise.all([
+      eventsById.load(roundsubmission.event_id),
+      roundsById.load(roundsubmission.round_id),
+      usersById.load(userId)
+    ]);
+    pubSub.publish('eventsChanged', { eventsChanged: [event] });
+    pubSub.publish(`event${event.id}Changed`, {
+      eventChanged: {
+        event,
+        message: `${participant.username} has submitted for round ${round.index + 1} of ${event.name}'`
+      }
+    });
     res.send({ code: 200, message: 'File uploaded!' });
   } catch (err) {
     res.send({ code: 500, message: err.message });
   }
 };
 
-exports.uploadEventFile = async (req, res) => {
+exports.uploadEventFile = pubSub => async (req, res) => {
   try {
+    let loaders = createLoaders();
+    let { usersById } = loaders;
     let { headers, files } = req;
     let { authorization } = headers;
     if (!authorization) throw new Error('Authorization required');
@@ -184,6 +202,14 @@ exports.uploadEventFile = async (req, res) => {
         await t.query(p.text, p.values),
         await t.query(p2.text, p2.values)
       ]);
+    });
+    let user = await usersById.load(userId);
+    pubSub.publish('eventsChanged', { eventsChanged: [event] });
+    pubSub.publish(`event${event.id}Changed`, {
+      eventChanged: {
+        event,
+        message: `${user.username} has set/changed the initial file for ${event.name}'`
+      }
     });
     res.send({ code: 200, message: 'File uploaded!' });
   } catch (err) {
