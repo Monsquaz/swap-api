@@ -30,14 +30,28 @@ let resolvers = {
     if (!song_id) return null;
     return await songsById.load(song_id);
   },
-  fileSeeded: async ({ file_id_seeded }, args, ctx) => {
+  fileSeeded: async ({ event_id, file_id_seeded }, args, ctx) => {
     let { userId, loaders } = ctx;
+    let event = await loaders.eventsById.load(event_id);
+    let { are_changes_visible, status } = event;
+    if (!are_changes_visible && status != 'Published') {
+      let { eventIsAdministeredByEventAndUser } = loaders;
+      let isAdmin = eventIsAdministeredByEventAndUser.load([event_id, userId]);
+      if (!isAdmin) return null;
+    }
     let { filesById } = loaders;
     if (!file_id_seeded) return null;
     return await filesById.load(file_id_seeded);
   },
-  fileSubmitted: async ({ file_id_submitted }, args, ctx) => {
+  fileSubmitted: async ({ event_id, file_id_submitted }, args, ctx) => {
     let { userId, loaders } = ctx;
+    let event = await loaders.eventsById.load(event_id);
+    let { are_changes_visible, status } = event;
+    if (!are_changes_visible && status != 'Published') {
+      let { eventIsAdministeredByEventAndUser } = loaders;
+      let isAdmin = eventIsAdministeredByEventAndUser.load([event_id, userId]);
+      if (!isAdmin) return null;
+    }
     let { filesById } = loaders;
     if (!file_id_submitted) return null;
     return await filesById.load(file_id_submitted);

@@ -105,7 +105,8 @@ exports.resolver = {
           .or(
              and('e.is_public = 1')
             .and(
-               or('e.are_changes_visible = 1')
+               or('e.is_schedule_visible = 1')
+              .or('e.are_changes_visible = 1')
               .or('e.status = ?', 'Published')
             )
           )
@@ -117,7 +118,8 @@ exports.resolver = {
           id: 'rs.id',
           eventId: 'e.id',
           roundId: 'rs.round_id',
-          songId: 'rs.song_id'
+          songId: 'rs.song_id',
+          participantId: 'COALESCE(rs.fill_in_participant, rs.participant)'
         },
         selection
      });

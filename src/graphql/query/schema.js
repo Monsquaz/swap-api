@@ -46,10 +46,12 @@ exports.schema = `
   })}
   ${createSelection({
     type: 'roundsubmission',
-    sortFields: ['id','songId','roundId'],
+    sortFields: ['id','songId','roundId','participantId'],
     directFields: {
       'songId': 'ID',
-      'roundId': 'ID'
+      'roundId': 'ID',
+      'participantId': 'ID',
+      'eventId': 'ID'
     },
     numericFields: [
       ['id', 'Int']

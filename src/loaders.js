@@ -20,9 +20,11 @@ const getAllJsFiles = dir =>
     return isDirectory ? [...files, ...getAllFiles(name)] : [...files, name];
   }, []);
 
+let batchFunctions = getAllJsFiles(`${__dirname}/dataloaders`)
+  .reduce((ack, filename) => ({ ...ack, ...require(filename) }), {});
+
 exports.createLoaders = () => ({
   ...createLoadersFromBatchFunctions(
-    getAllJsFiles(`${__dirname}/dataloaders`)
-      .reduce((ack, filename) => ({ ...ack, ...require(filename) }), {})
+    batchFunctions
   )
 });

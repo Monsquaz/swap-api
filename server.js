@@ -11,6 +11,8 @@ import fileUpload from 'express-fileupload';
 import config from './config';
 import fs from 'fs';
 
+process.setMaxListeners(0); 
+
 const pubSub = new PubSub();
 
 process.chdir(__dirname);

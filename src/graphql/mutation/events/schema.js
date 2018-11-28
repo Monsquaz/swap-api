@@ -9,6 +9,7 @@ exports.mutation = `
   nextEventRound(id: ID!): StatusResponse!
   leaveEvent(id: ID!): StatusResponse!
   cancelEvent(id: ID!): StatusResponse!
+  removeInitialEventFile(id: ID!): StatusResponse!
 `;
 
 exports.schema = `

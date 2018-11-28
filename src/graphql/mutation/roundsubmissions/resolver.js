@@ -5,12 +5,12 @@ const or = (...args) => squel.expr().or(...args);
 const { select, insert, update, rstr } = squel;
 let _delete = squel.delete;
 import db from '../../../../db';
-import { findFillIn } from '../../../util';
+import { findFillIn, getMailer } from '../../../util';
 
 exports.resolver = {
   Mutation: {
     refuteRoundsubmission: async (_, args, ctx) => {
-      let { id } = args;
+      let { id, reason } = args;
       let { userId, loaders, pubSub } = ctx;
       let { roundsubmissionsById, eventsById, usersById, roundsById } = loaders;
       let roundsubmission = await roundsubmissionsById.load(id);
@@ -29,9 +29,21 @@ exports.resolver = {
       await db.query(text, values)
       let [ host, participant, round ] = await Promise.all([
         usersById.load(userId),
-        usersById.load(roundsubmission.user_id),
+        usersById.load(roundsubmission.participant),
         roundsById.load(roundsubmission.round_id)
       ]);
+      let mailer = getMailer();
+      mailer.sendMail({
+        from: 'swap@monsquaz.org',
+        to: participant.email,
+        subject: `${event.name}: Refuted R${round.index + 1} submission.`,
+        text: `Hi ${participant.firstname}!` + '\n' +
+          `${host.username} has refuted your submission with the following reason:` + '\n\n' +
+          `"${reason}"` + '\n\n' +
+          'You may submit again once you\'ve complied and corrected your changes' + '\n\n' +
+          'Regards,\n' +
+          'Monsquaz Swap'
+      })
       pubSub.publish('eventsChanged', { eventsChanged: [event] });
       pubSub.publish(`event${event.id}Changed`, {
         eventChanged: {

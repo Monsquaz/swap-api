@@ -6,7 +6,6 @@ db.query = (...args) => {
   console.warn(args);
   return db._query(...args);
 }
-
 db.transaction = async (p) => {
   // No transactions for now
   //return await p(db);
@@ -29,6 +28,7 @@ db.transaction = async (p) => {
   try {
     let c = {
       query: (...args) => new Promise((resolve, reject) => {
+        console.warn(args);
         con.query(...args, (err, result) => {
           if (err) {
             return reject(err);

@@ -99,7 +99,9 @@ exports.resolver = {
       let { userId, loaders, pubSub } = ctx;
       let { eventsById, usersById } = loaders;
       let { id } = args;
-      let event = await eventsById.load(id);
+      let [ event, user ] = await Promise.all([
+        eventsById.load(id), usersById.load(userId)
+      ]);
       if (!event) throw new Error ('Event not found');
       if (userId != event.host_user_id) {
         throw new Error('You can only update your own events');
@@ -108,7 +110,6 @@ exports.resolver = {
       let { text, values }
         = update().table('events').set('status = ?', 'Cancelled').where('id = ?', id).toParam();
       let result = await db.query(text, values);
-      let user = await usersById.load(userId);
       pubSub.publish('eventsChanged', { eventsChanged: [event] });
       pubSub.publish(`event${event.id}Changed`, {
         eventChanged: {
@@ -117,6 +118,31 @@ exports.resolver = {
         }
       });
       return { code: 200, message: 'Event cancelled successfully' };
+    },
+
+    removeInitialEventFile: async (_, args, ctx) => {
+      let { id } = args;
+      let { userId, loaders, pubSub } = ctx;
+      let { eventsById, usersById } = loaders;
+      let [ event, user ] = await Promise.all([
+        eventsById.load(id), usersById.load(userId)
+      ]);
+      if (!event) throw new Error ('Event not found');
+      if (userId != event.host_user_id) {
+        throw new Error('You can only update your own events');
+      }
+      if (event.status != 'Planned') throw new Error('Initial event file can\'t be removed if started.');
+      let { text, values }
+        = update().table('events').set('initial_file = ?', rstr('NULL')).where('id = ?', id).toParam();
+      let result = await db.query(text, values);
+      pubSub.publish('eventsChanged', { eventsChanged: [event] });
+      pubSub.publish(`event${event.id}Changed`, {
+        eventChanged: {
+          event,
+          message: `${user.username} has removed the initial file for ${event.name}`
+        }
+      });
+      return { code: 200, message: 'Initial file was removed for event successfully' };
     },
 
     removeParticipantFromEvent: async (_, args, ctx) => {
@@ -545,21 +571,18 @@ let handleRoundComplete = async (event, round, t) => {
   if (roundsubmissions.length > 0) {
       let batch = [];
       for (let i = 0; i < roundsubmissions.length; i++) {
-        switch (roundsubmissions[i].status) {
-          case 'Planned': {
-            param = update().table('roundsubmissions')
-              .setFields({
-                file_id_seeded: roundsubmissions[i].seedFile,
-                status: 'Started'
-              })
-              .where('id = ?', roundsubmissions[i].id).toParam();
-            batch.push(t.query(param.text, param.values));
-            break;
-          }
-          case 'FillInRequested': {
-            await findFillIn(roundsubmissions[i]);
-            break;
-          }
+        param = update().table('roundsubmissions')
+          .setFields({ file_id_seeded: roundsubmissions[i].seedFile })
+          .where('id = ?', roundsubmissions[i].id).toParam();
+        batch.push(t.query(param.text, param.values));
+        if (roundsubmissions[i].status == 'Planned') {
+          param = update().table('roundsubmissions')
+            .setFields({ status: 'Started' })
+            .where('id = ?', roundsubmissions[i].id).toParam();
+          batch.push(t.query(param.text, param.values));
+        }
+        if (roundsubmissions[i].status == 'FillInRequested') {
+          await findFillIn(roundsubmissions[i]);
         }
         if (batch.length > 5) { // Just so we don't overload
           await Promise.all(batch);

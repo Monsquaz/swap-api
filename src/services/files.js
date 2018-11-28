@@ -38,6 +38,7 @@ exports.getFile = async (req, res) => {
     if (userId) {
       where2 = where2
        .or('e.host_user_id = ?', userId)
+       .or('esu.host_user_id = ?', userId)
        .or('? IN (rsse.participant, rsse.fill_in_participant)', userId)
        .or(
           and('rssu.participant = ?', userId)
@@ -96,11 +97,11 @@ exports.uploadRoundsubmissionFile = pubSub => async (req, res) => {
          or(
             and('rs.participant = ?', userId)
            .and('rs.fill_in_participant IS NULL')
-           .and('rs.status IN ?', ['Started','Submitted'])
+           .and('rs.status IN ?', ['Started','Submitted','Refuted'])
          )
         .or(
            and('rs.fill_in_participant = ?', userId)
-          .and('rs.status IN ?', ['FillInAquired','Submitted'])
+          .and('rs.status IN ?', ['FillInAquired','Submitted','Refuted'])
         )
       )
     ).toParam();

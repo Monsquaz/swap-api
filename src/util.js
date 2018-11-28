@@ -60,10 +60,10 @@ exports.uniqT = uniqT;
 
 exports.truncateWithEllipses = (text, max) => text.substr(0,max-1)+(text.length>max?'&hellip;':'');
 
-
-exports.getMailer = () => {
+const getMailer = () => {
   return nodemailer.createTransport(config.nodemailer);
 };
+exports.getMailer = getMailer;
 
 // Temp. For debugging.
 /*
@@ -90,10 +90,16 @@ exports.isCaptchaOK = async (response) => {
 
 exports.findFillIn = async (roundsubmission) => {
   let param = select()
+    .field('e.name')
+    .field('e.slug')
+    .field('e.current_round')
     .field('ep.user_id')
-    .field(rstr('COUNT(fia.id)'), 'numFillins')
+    .field('u.firstname')
+    .field('u.email')
+    .field(rstr('COALESCE(COUNT(fia.id),0)'), 'numFillins')
     .from('events', 'e')
     .join('event_participants', 'ep', 'e.id = ep.event_id')
+    .join('users', 'u', 'ep.user_id = u.id')
     .join('roundsubmissions', 'rs', 'e.id = rs.event_id')
     .left_join('fill_in_attempts', 'fia', 'rs.id = fia.roundsubmission_id')
     .where(
@@ -131,7 +137,7 @@ exports.findFillIn = async (roundsubmission) => {
     .group('ep.user_id')
     .group('ep.id')
     .order('numFillins')
-    .order('ep.id')
+    //.order('ep.id')
     .order('RAND()')
     .limit(1)
     .toParam();
@@ -152,6 +158,24 @@ exports.findFillIn = async (roundsubmission) => {
         created: rstr('NOW()')
       }).toParam();
       batch.push(t.query(param.text, param.values));
+      let { current_round, name, slug, firstname, email } = rows[0];
+      if (current_round == roundsubmission.round_id) {
+        let url =
+          `${config.siteUrl}/events/${slug}`;
+        let mailer = getMailer();
+        mailer.sendMail({
+          from: 'swap@monsquaz.org',
+          to: email,
+          subject: `${name}: Filling in for current round`,
+          text: `Hi ${firstname}!` + '\n' +
+            `You have been assigned as a fill in for the current round` + '\n' +
+            `Go to ` + '\n' +
+            `${url}` + '\n\n' +
+            'To see what\'s going on\n\n' +
+            'Regards,\n' +
+            'Monsquaz Swap'
+        });
+      }
     } else {
       updateData = {
         status: 'FillInRequested'

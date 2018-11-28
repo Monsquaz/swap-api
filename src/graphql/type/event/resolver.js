@@ -58,7 +58,8 @@ const baseResolvers = {
           .or(
              and('e.is_public = 1')
             .and(
-               or('e.are_changes_visible = 1')
+               or('e.is_schedule_visible = 1')
+              .or('e.are_changes_visible = 1')
               .or('e.status = ?', 'Published')
             )
           )
