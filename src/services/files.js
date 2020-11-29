@@ -2,12 +2,12 @@ const squel = require("squel");
 const { insert, update, select, expr } = squel;
 const and = (...args) => expr().and(...args);
 const or  = (...args) => expr().or( ...args);
-import fs from 'fs';
-import mime from 'mime-to-extensions';
-import { getUserIdFromToken } from '../util';
-import db from '../../db';
-import { filesDir } from '../../config';
-import { createLoaders } from '../loaders';
+const fs = require('fs');
+const mime = require('mime-to-extensions');
+const { getUserIdFromToken } = require('../util');
+const db = require('../../db');
+const { filesDir } = require('../../config');
+const { createLoaders } = require('../loaders');
 
 exports.getFile = async (req, res) => {
   try {

@@ -1,4 +1,4 @@
-import md5 from 'md5';
+const md5 = require('md5');
 
 const resolvers = {
   gravatar: (user, args, ctx) => {

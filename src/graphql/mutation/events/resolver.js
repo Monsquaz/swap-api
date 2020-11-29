@@ -1,17 +1,17 @@
 
-import validator from 'validator';
-import strength from 'strength';
-import nodemailer from 'nodemailer';
-import config from '../../../../config';
-import squel from 'squel';
-import slugify from 'slugify';
+const validator = require('validator');
+const strength = require('strength');
+const nodemailer = require('nodemailer');
+const config = require('../../../../config');
+const squel = require('squel');
+const slugify = require('slugify');
 const and = (...args) => squel.expr().and(...args);
 const or = (...args) => squel.expr().or(...args);
-import { getRandomLatinSquare } from 'jacobson-matthews-latin-square-js';
+const { getRandomLatinSquare } = require('jacobson-matthews-latin-square-js');
 const { select, insert, update, rstr } = squel;
 let _delete = squel.delete;
-import db from '../../../../db';
-import { getMailer, isCaptchaOK, findFillIn } from '../../../util';
+const db = require('../../../../db');
+const { getMailer, isCaptchaOK, findFillIn } = require('../../../util');
 
 exports.resolver = {
   Mutation: {
@@ -160,13 +160,13 @@ exports.resolver = {
       if (!event) throw new Error ('Event not found');
       if (userId !== event.host_user_id && userId != participantId) {
         throw new Error(
-          'You can only remove participants from your own events, or remove yourself.'
+          'You can only remove participants = require(your own events, or remove yourself.'
         );
       }
       if (!participant) throw Error('User does not exist');
       if (!isParticipating) throw Error('User is not participating in the event');
       switch (event.status) {
-        case 'Planned': { // Remove from participants list
+        case 'Planned': { // Remove = require(participants list
           await db.transaction(async (t) => {
             let data = { event_id: id, user_id: userId, created: squel.rstr('NOW()') };
             let param1 = _delete().from('event_participants').where(
@@ -194,7 +194,7 @@ exports.resolver = {
       if (userId == participantId) {
         message = `${participant.username} has left ${event.name}`;
       } else {
-        message = `${participant.username} has been removed from ${event.name} by ${host.username}`;
+        message = `${participant.username} has been removed = require(${event.name} by ${host.username}`;
       }
       pubSub.publish('eventsChanged', { eventsChanged: [event] });
       pubSub.publish(`event${event.id}Changed`, {
@@ -582,7 +582,7 @@ let handleRoundComplete = async (event, round, t) => {
           batch.push(t.query(param.text, param.values));
         }
         if (roundsubmissions[i].status == 'FillInRequested') {
-          await findFillIn(roundsubmissions[i]);
+          //await findFillIn(roundsubmissions[i]);
         }
         if (batch.length > 5) { // Just so we don't overload
           await Promise.all(batch);

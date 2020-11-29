@@ -1,8 +1,8 @@
-import {
+const {
   createIdFieldSqlBatcher,
   createForeignFieldSqlBatcher,
   _Q,
   listByField
-} from '../util';
+} = require('../util');
 
 exports.filesById = createIdFieldSqlBatcher('files','id');

@@ -1,15 +1,15 @@
-import {
+const {
   createIdFieldSqlBatcher,
   createForeignFieldSqlBatcher,
   _Q,
   listByTuple
-} from '../util';
+} = require('../util');
 
 const squel = require("squel");
 const { select, expr } = squel;
 const and = (...args) => expr().and(...args);
 const or  = (...args) => expr().or( ...args);
-import db from '../../db';
+const db = require('../../db');
 
 exports.usersById = createIdFieldSqlBatcher('users','id');
 exports.usersByUsername = createIdFieldSqlBatcher('users','username');

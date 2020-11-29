@@ -2,7 +2,7 @@ const squel = require("squel");
 const { select, expr } = squel;
 const and = (...args) => expr().and(...args);
 const or  = (...args) => expr().or( ...args);
-import { truncateWithEllipses } from '../../../util';
+const { truncateWithEllipses } = require('../../../util');
 
 const baseResolvers = {
   id: ({ id }) => id,

@@ -1,6 +1,6 @@
-import DataLoader from 'dataloader';
-import fs from 'fs';
-import path from 'path';
+const DataLoader = require('dataloader');
+const fs = require('fs');
+const path = require('path');
 
 const options = { maxBatchSize: 500 }
 

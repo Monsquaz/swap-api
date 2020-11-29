@@ -1,4 +1,4 @@
-import { schemaHelper } from '../../util';
+const { schemaHelper } = require('../../util');
 const { createRootQuery, createSelection } = schemaHelper;
 
 exports.query = `

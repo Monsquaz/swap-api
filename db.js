@@ -1,5 +1,5 @@
 var db = require('mysql2-promise')();
-import config from './config';
+const config = require('./config');
 db.configure(config.db);
 db._query = db.query;
 db.query = (...args) => {
@@ -60,4 +60,4 @@ db.transaction = async (p) => {
   }
 }
 
-export default db;
+module.exports = db;

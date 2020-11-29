@@ -1,11 +1,11 @@
-import config from '../../../../config';
-import squel from 'squel';
+const config = require('../../../../config');
+const squel = require('squel');
 const and = (...args) => squel.expr().and(...args);
 const or = (...args) => squel.expr().or(...args);
 const { select, insert, update, rstr } = squel;
 let _delete = squel.delete;
-import db from '../../../../db';
-import { findFillIn, getMailer } from '../../../util';
+const db = require('../../../../db');
+const { findFillIn, getMailer } = require('../../../util');
 
 exports.resolver = {
   Mutation: {

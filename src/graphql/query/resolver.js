@@ -2,7 +2,7 @@ const squel = require("squel");
 const { select, expr } = squel;
 const and = (...args) => expr().and(...args);
 const or  = (...args) => expr().or( ...args);
-import { performSelection, filterFns } from '../../util';
+const { performSelection, filterFns } = require('../../util');
 
 exports.resolver = {
   Query: {

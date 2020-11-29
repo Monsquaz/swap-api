@@ -1,13 +1,13 @@
 const squel = require('squel');
 const uniq = require('lodash.uniq');
 const inflector = require('inflector');
-import jwt from 'jsonwebtoken';
-import nodemailer from 'nodemailer';
+const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 const and = (...args) => squel.expr().and(...args);
 const or = (...args) => squel.expr().or(...args);
 const { select, insert, update, rstr } = squel;
-import config from '../config';
-import db from '../db';
+const config = require('../config');
+const db = require('../db');
 
 let applyFilter = (filter, fieldAliases = {}, customFilters = {}) => {
   return Object.keys(filter).reduce((expr, k) => {
@@ -73,7 +73,7 @@ exports.getMailer = () => ({
   }
 });*/
 
-import reCaptcha from 'recaptcha2';
+const reCaptcha = require('recaptcha2');
 
 exports.isCaptchaOK = async (response) => {
   let recaptcha = new reCaptcha({

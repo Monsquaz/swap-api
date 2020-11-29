@@ -1,19 +1,31 @@
-import { GraphQLServer, PubSub } from 'graphql-yoga'
-import glue from 'schemaglue';
-import { createLoaders } from './src/loaders';
-import { getUserIdFromToken } from './src/util';
-import {
+const { GraphQLServer, PubSub } = require('graphql-yoga');
+const glue = require('schemaglue');
+const { createLoaders } = require('./src/loaders');
+const { getUserIdFromToken } = require('./src/util');
+const {
   getFile,
   uploadRoundsubmissionFile,
-  uploadEventFile
-} from './src/services/files';
-import fileUpload from 'express-fileupload';
-import config from './config';
-import fs from 'fs';
+  uploadEventFile 
+} = require('./src/services/files');
+const fileUpload = require('express-fileupload');
+const config = require('./config');
+const fs = require('fs');
+const axios = require('axios');
 
-process.setMaxListeners(0); 
+process.setMaxListeners(0);
 
 const pubSub = new PubSub();
+
+pubSub.subscribe('event54Changed', (data) => {
+  if (!data.eventChanged) { return; }
+  if (typeof data.eventChanged !== 'object') { return; }
+  if (!data.eventChanged.message) { return; }
+  axios.post(
+    `https://discord.com/api/webhooks/709808826542588025/gyawODfzcfeUzI8Go3I2bjmI2Imd4fXcm04bhR-7fQopIbZs2HBIcoDKRJcpaOGJV7Z8`, {
+      content: data.eventChanged.message
+    }
+  );
+});
 
 process.chdir(__dirname);
 const { schema, resolver } = glue(`src/graphql`);

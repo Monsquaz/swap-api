@@ -1,18 +1,18 @@
-import crypto from 'crypto';
-import base64url from 'base64url';
-import phpPassword from 'node-php-password';
-import validator from 'validator';
-import strength from 'strength';
-import slugify from 'slugify';
-import nodemailer from 'nodemailer';
-import config from '../../../../config';
-import squel from 'squel';
+const crypto = require('crypto');
+const base64url = require('base64url');
+const phpPassword = require('node-php-password');
+const validator = require('validator');
+const strength = require('strength');
+const slugify = require('slugify');
+const nodemailer = require('nodemailer');
+const config = require('../../../../config');
+const squel = require('squel');
 const and = (...args) => squel.expr().and(...args);
 const or = (...args) => squel.expr().or(...args);
 const { select, insert, update, rstr } = squel;
-import jwt from 'jsonwebtoken';
-import db from '../../../../db';
-import { getMailer, isCaptchaOK } from '../../../util';
+const jwt = require('jsonwebtoken');
+const db = require('../../../../db');
+const { getMailer, isCaptchaOK } = require('../../../util');
 
 exports.resolver = {
   Mutation: {

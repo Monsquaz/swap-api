@@ -1,4 +1,4 @@
-import db from '../../db';
+const db = require('../../db');
 
 exports.sql = async (params) => {
   return await Promise.all(params.map(async (param) => {
