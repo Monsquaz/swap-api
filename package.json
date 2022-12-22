@@ -22,7 +22,7 @@
     "graphql-yoga": "^1.14.12",
     "inflector": "0.0.1",
     "jacobson-matthews-latin-square-js": "^1.2.1",
-    "jsonwebtoken": "^8.3.0",
+    "jsonwebtoken": "^9.0.0",
     "lodash.uniq": "^4.5.0",
     "mime-to-extensions": "^1.0.2",
     "mysql2-promise": "^0.1.4",
